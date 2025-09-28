@@ -397,8 +397,14 @@ async def update_activity(
     update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
     update_dict["updated_at"] = datetime.utcnow()
     
-    await db.actividades.update_one({"id": activity_id}, {"$set": update_dict})
+    result = await db.actividades.update_one({"id": activity_id}, {"$set": update_dict})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
     updated_activity = await db.actividades.find_one({"id": activity_id})
+    if not updated_activity:
+        raise HTTPException(status_code=404, detail="Activity not found after update")
+    
     return Activity(**updated_activity)
 
 @api_router.delete("/actividades/{activity_id}")
