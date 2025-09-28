@@ -491,14 +491,14 @@ const Dashboard = () => {
               <p className="text-gray-600 text-sm">Crea y administra las actividades del colegio</p>
             </Link>
             <Link 
-              to="/estudiantes" 
+              to="/admin/estudiantes" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-green-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Estudiantes</h3>
-              <p className="text-gray-600 text-sm">Administra los estudiantes</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Gestión de Estudiantes</h3>
+              <p className="text-gray-600 text-sm">Administra los estudiantes del colegio</p>
             </Link>
             <Link 
-              to="/inscripciones" 
+              to="/admin/inscripciones" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-yellow-500"
             >
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Inscripciones</h3>
@@ -513,21 +513,21 @@ const Dashboard = () => {
               to="/mis-hijos" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-purple-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Mis Hijos</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">👶 Mis Hijos</h3>
               <p className="text-gray-600 text-sm">Gestiona la información de tus hijos</p>
             </Link>
             <Link 
               to="/actividades" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-blue-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Actividades del Colegio</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">🎯 Actividades del Colegio</h3>
               <p className="text-gray-600 text-sm">Descubre e inscríbete en actividades</p>
             </Link>
             <Link 
               to="/mis-inscripciones" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-orange-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Mis Inscripciones</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📋 Mis Inscripciones</h3>
               <p className="text-gray-600 text-sm">Revisa el estado de las inscripciones</p>
             </Link>
           </>
@@ -814,6 +814,7 @@ const ActividadesPadresPage = () => {
                 <button
                   onClick={() => handleInscripcion(actividad)}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors font-semibold"
+                  data-testid={`inscribir-actividad-${actividad.id}`}
                 >
                   Ver Detalles e Inscribir
                 </button>
@@ -835,6 +836,428 @@ const ActividadesPadresPage = () => {
           }}
         />
       )}
+    </Layout>
+  );
+};
+
+// Página "Mis Inscripciones" para Padres
+const MisInscripcionesPage = () => {
+  const [inscripciones, setInscripciones] = useState([]);
+  const [actividades, setActividades] = useState({});
+  const [estudiantes, setEstudiantes] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadMisInscripciones();
+  }, []);
+
+  const loadMisInscripciones = async () => {
+    try {
+      // Cargar inscripciones
+      const inscripcionesResponse = await axios.get(`${API}/inscripciones`);
+      const inscripcionesData = inscripcionesResponse.data;
+      
+      // Cargar actividades para obtener detalles
+      const actividadesResponse = await axios.get(`${API}/actividades`);
+      const actividadesMap = {};
+      actividadesResponse.data.forEach(act => {
+        actividadesMap[act.id] = act;
+      });
+      
+      // Cargar estudiantes para obtener nombres
+      const estudiantesResponse = await axios.get(`${API}/estudiantes`);
+      const estudiantesMap = {};
+      estudiantesResponse.data.forEach(est => {
+        estudiantesMap[est.id] = est;
+      });
+      
+      setInscripciones(inscripcionesData);
+      setActividades(actividadesMap);
+      setEstudiantes(estudiantesMap);
+    } catch (error) {
+      console.error('Error cargando inscripciones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getEstadoBadge = (estado) => {
+    const colors = {
+      'pendiente': 'bg-yellow-100 text-yellow-800',
+      'confirmada': 'bg-green-100 text-green-800',
+      'pago_pendiente': 'bg-orange-100 text-orange-800',
+      'cancelada': 'bg-red-100 text-red-800'
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getEstadoLabel = (estado) => {
+    const labels = {
+      'pendiente': 'Pendiente',
+      'confirmada': 'Confirmada',
+      'pago_pendiente': 'Pago Pendiente',
+      'cancelada': 'Cancelada'
+    };
+    return labels[estado] || estado;
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Mis Inscripciones">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Mis Inscripciones">
+      <div className="mb-6">
+        <p className="text-gray-600">Revisa el estado de las inscripciones de tus hijos</p>
+      </div>
+
+      {inscripciones.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📋</div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No hay inscripciones aún</h3>
+          <p className="text-gray-600 mb-4">Inscribe a tus hijos en las actividades del colegio</p>
+          <Link
+            to="/actividades"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Ver Actividades
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {inscripciones.map((inscripcion) => {
+            const actividad = actividades[inscripcion.actividad_id];
+            const estudiante = estudiantes[inscripcion.estudiante_id];
+            
+            if (!actividad || !estudiante) return null;
+
+            return (
+              <div key={inscripcion.id} className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mr-3">
+                        {actividad.nombre}
+                      </h3>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoBadge(inscripcion.estado)}`}>
+                        {getEstadoLabel(inscripcion.estado)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                      <div>
+                        <p><span className="font-medium">Estudiante:</span> {estudiante.nombre_completo}</p>
+                        <p><span className="font-medium">Curso:</span> {estudiante.curso_grado}</p>
+                        <p><span className="font-medium">Fecha:</span> {new Date(actividad.fecha_inicio).toLocaleDateString('es-ES')}</p>
+                      </div>
+                      <div>
+                        <p><span className="font-medium">Responsable:</span> {actividad.responsable}</p>
+                        {actividad.costo_estudiante > 0 && (
+                          <p><span className="font-medium">Costo:</span> ${actividad.costo_estudiante}</p>
+                        )}
+                        <p><span className="font-medium">Inscrito:</span> {new Date(inscripcion.created_at).toLocaleDateString('es-ES')}</p>
+                      </div>
+                    </div>
+
+                    {inscripcion.comentarios && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Comentario:</span> {inscripcion.comentarios}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {inscripcion.estado === 'pago_pendiente' && (
+                    <div className="ml-4">
+                      <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                        Realizar Pago
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Página "Mis Hijos" para Padres
+const MisHijosPage = () => {
+  const [misHijos, setMisHijos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+
+  useEffect(() => {
+    loadMisHijos();
+  }, []);
+
+  const loadMisHijos = async () => {
+    try {
+      const response = await axios.get(`${API}/estudiantes`);
+      setMisHijos(response.data);
+    } catch (error) {
+      console.error('Error cargando hijos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (estudiante) => {
+    setEditingStudent(estudiante);
+    setShowForm(true);
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Mis Hijos">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Mis Hijos">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Gestiona la información de tus hijos</p>
+        <button
+          onClick={() => {
+            setEditingStudent(null);
+            setShowForm(true);
+          }}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
+          data-testid="agregar-hijo-btn"
+        >
+          + Agregar Hijo
+        </button>
+      </div>
+
+      {showForm && (
+        <FormularioEstudiante
+          estudiante={editingStudent}
+          onSave={() => {
+            setShowForm(false);
+            setEditingStudent(null);
+            loadMisHijos();
+          }}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingStudent(null);
+          }}
+        />
+      )}
+
+      {misHijos.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">👶</div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No has agregado hijos aún</h3>
+          <p className="text-gray-600">Agrega la información de tus hijos para inscribirlos en actividades</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {misHijos.map((hijo) => (
+            <div key={hijo.id} className="bg-white rounded-lg shadow p-6">
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">👧</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">{hijo.nombre_completo}</h3>
+                <p className="text-gray-600">{hijo.curso_grado}</p>
+              </div>
+
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Fecha de Nacimiento:</span>
+                  <span>{new Date(hijo.fecha_nacimiento).toLocaleDateString('es-ES')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Edad:</span>
+                  <span>{Math.floor((new Date() - new Date(hijo.fecha_nacimiento)) / (365.25 * 24 * 60 * 60 * 1000))} años</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t flex space-x-2">
+                <button
+                  onClick={() => handleEdit(hijo)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-3 rounded hover:bg-gray-200 text-sm"
+                  data-testid={`editar-hijo-${hijo.id}`}
+                >
+                  Editar
+                </button>
+                <button className="flex-1 bg-blue-600 text-white py-2 px-3 rounded hover:bg-blue-700 text-sm">
+                  Ver Actividades
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Gestión de Estudiantes (Admin)
+const AdminEstudiantesPage = () => {
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+
+  useEffect(() => {
+    loadEstudiantes();
+  }, []);
+
+  const loadEstudiantes = async () => {
+    try {
+      const response = await axios.get(`${API}/estudiantes`);
+      setEstudiantes(response.data);
+    } catch (error) {
+      console.error('Error cargando estudiantes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (estudiante) => {
+    setEditingStudent(estudiante);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Estás seguro de eliminar este estudiante?')) {
+      try {
+        // Implementar delete endpoint
+        alert('Funcionalidad de eliminar pendiente por implementar');
+      } catch (error) {
+        alert('Error eliminando estudiante');
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Estudiantes">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Estudiantes">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Administra los estudiantes del colegio</p>
+        <button
+          onClick={() => {
+            setEditingStudent(null);
+            setShowForm(true);
+          }}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+        >
+          + Nuevo Estudiante
+        </button>
+      </div>
+
+      {showForm && (
+        <FormularioEstudiante
+          estudiante={editingStudent}
+          isAdmin={true}
+          onSave={() => {
+            setShowForm(false);
+            setEditingStudent(null);
+            loadEstudiantes();
+          }}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingStudent(null);
+          }}
+        />
+      )}
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estudiante
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Curso
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Edad
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Padre
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {estudiantes.map((estudiante) => (
+              <tr key={estudiante.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-10 w-10">
+                      <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                        <span className="text-lg">👧</span>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900">{estudiante.nombre_completo}</div>
+                      <div className="text-sm text-gray-500">{new Date(estudiante.fecha_nacimiento).toLocaleDateString('es-ES')}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {estudiante.curso_grado}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {Math.floor((new Date() - new Date(estudiante.fecha_nacimiento)) / (365.25 * 24 * 60 * 60 * 1000))} años
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {estudiante.padre_id || 'No asignado'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                  <button
+                    onClick={() => handleEdit(estudiante)}
+                    className="text-indigo-600 hover:text-indigo-900"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(estudiante.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        
+        {estudiantes.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">No hay estudiantes registrados aún</p>
+          </div>
+        )}
+      </div>
     </Layout>
   );
 };
@@ -876,7 +1299,7 @@ const DetalleInscripcionModal = ({ actividad, misHijos, onClose, onInscripcion }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" data-testid="modal-detalle-inscripcion">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
@@ -884,6 +1307,7 @@ const DetalleInscripcionModal = ({ actividad, misHijos, onClose, onInscripcion }
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
+              data-testid="cerrar-modal-btn"
             >
               ×
             </button>
@@ -970,6 +1394,7 @@ const DetalleInscripcionModal = ({ actividad, misHijos, onClose, onInscripcion }
                     checked={selectedHijo === hijo.id}
                     onChange={(e) => setSelectedHijo(e.target.value)}
                     className="mr-3"
+                    data-testid={`hijo-option-${hijo.id}`}
                   />
                   <div>
                     <div className="font-medium">{hijo.nombre_completo}</div>
@@ -997,10 +1422,205 @@ const DetalleInscripcionModal = ({ actividad, misHijos, onClose, onInscripcion }
               onClick={handleInscribir}
               disabled={loading || !selectedHijo || misHijos.filter(hijoElegible).length === 0}
               className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 font-semibold"
+              data-testid="confirmar-inscripcion-btn"
             >
               {loading ? 'Inscribiendo...' : 'Confirmar Inscripción'}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Formulario para agregar/editar estudiantes
+const FormularioEstudiante = ({ estudiante, isAdmin = false, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    nombre_completo: '',
+    fecha_nacimiento: '',
+    curso_grado: '',
+    padre_id: '',
+    informacion_medica: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (estudiante) {
+      setFormData({
+        nombre_completo: estudiante.nombre_completo || '',
+        fecha_nacimiento: estudiante.fecha_nacimiento ? 
+          (typeof estudiante.fecha_nacimiento === 'string' ? 
+            estudiante.fecha_nacimiento.split('T')[0] : 
+            estudiante.fecha_nacimiento.toISOString().split('T')[0]) : '',
+        curso_grado: estudiante.curso_grado || '',
+        padre_id: estudiante.padre_id || '',
+        informacion_medica: estudiante.informacion_medica ? 
+          (typeof estudiante.informacion_medica === 'object' ? 
+            JSON.stringify(estudiante.informacion_medica) : 
+            estudiante.informacion_medica) : ''
+      });
+    }
+  }, [estudiante]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const payload = {
+        ...formData,
+        informacion_medica: formData.informacion_medica ? 
+          { notas: formData.informacion_medica } : null
+      };
+
+      if (estudiante) {
+        // Actualizar - endpoint pendiente por implementar
+        alert('Funcionalidad de editar pendiente por implementar');
+      } else {
+        await axios.post(`${API}/estudiantes`, payload);
+      }
+
+      onSave();
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Error al guardar el estudiante');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-4">
+            {estudiante ? 'Editar Estudiante' : 'Agregar Estudiante'}
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre Completo *
+              </label>
+              <input
+                type="text"
+                name="nombre_completo"
+                value={formData.nombre_completo}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                required
+                data-testid="nombre-completo-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha de Nacimiento *
+              </label>
+              <input
+                type="date"
+                name="fecha_nacimiento"
+                value={formData.fecha_nacimiento}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                required
+                data-testid="fecha-nacimiento-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Curso/Grado *
+              </label>
+              <select
+                name="curso_grado"
+                value={formData.curso_grado}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                required
+                data-testid="curso-grado-select"
+              >
+                <option value="">Selecciona un curso</option>
+                <option value="Pre-Kinder">Pre-Kinder</option>
+                <option value="Kinder">Kinder</option>
+                <option value="1ro A">1ro A</option>
+                <option value="1ro B">1ro B</option>
+                <option value="2do A">2do A</option>
+                <option value="2do B">2do B</option>
+                <option value="3ro A">3ro A</option>
+                <option value="3ro B">3ro B</option>
+                <option value="4to A">4to A</option>
+                <option value="4to B">4to B</option>
+                <option value="5to A">5to A</option>
+                <option value="5to B">5to B</option>
+                <option value="6to A">6to A</option>
+                <option value="6to B">6to B</option>
+              </select>
+            </div>
+
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID del Padre
+                </label>
+                <input
+                  type="text"
+                  name="padre_id"
+                  value={formData.padre_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Opcional - ID del padre/tutor"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Información Médica
+              </label>
+              <textarea
+                name="informacion_medica"
+                value={formData.informacion_medica}
+                onChange={handleChange}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Alergias, medicamentos, condiciones especiales..."
+              />
+            </div>
+
+            <div className="flex justify-end space-x-4 pt-4 border-t">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                data-testid="guardar-estudiante-btn"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -1327,6 +1947,24 @@ const App = () => {
             } 
           />
           
+          <Route 
+            path="/admin/estudiantes" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <AdminEstudiantesPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/admin/inscripciones" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Gestión de Inscripciones" />
+              </ProtectedRoute>
+            } 
+          />
+          
           {/* Rutas para Padres */}
           <Route 
             path="/actividades" 
@@ -1338,28 +1976,10 @@ const App = () => {
           />
           
           <Route 
-            path="/estudiantes" 
-            element={
-              <ProtectedRoute allowedRoles={['admin_colegio']}>
-                <ComingSoon title="Gestión de Estudiantes" />
-              </ProtectedRoute>
-            } 
-          />
-          
-          <Route 
-            path="/inscripciones" 
-            element={
-              <ProtectedRoute allowedRoles={['admin_colegio']}>
-                <ComingSoon title="Gestión de Inscripciones" />
-              </ProtectedRoute>
-            } 
-          />
-          
-          <Route 
             path="/mis-hijos" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Mis Hijos" />
+                <MisHijosPage />
               </ProtectedRoute>
             } 
           />
@@ -1368,7 +1988,7 @@ const App = () => {
             path="/mis-inscripciones" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Mis Inscripciones" />
+                <MisInscripcionesPage />
               </ProtectedRoute>
             } 
           />
