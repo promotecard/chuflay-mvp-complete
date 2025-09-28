@@ -133,7 +133,7 @@ class EstudianteCreate(BaseModel):
     nombre_completo: str
     fecha_nacimiento: date
     curso_grado: str
-    colegio_id: str
+    colegio_id: Optional[str] = None
     padre_id: Optional[str] = None
 
 # Activity Models
