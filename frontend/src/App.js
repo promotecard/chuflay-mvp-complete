@@ -484,11 +484,11 @@ const Dashboard = () => {
         {user.role === 'admin_colegio' && (
           <>
             <Link 
-              to="/actividades" 
+              to="/admin/actividades" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-blue-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Actividades</h3>
-              <p className="text-gray-600 text-sm">Gestiona las actividades escolares</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Gestión de Actividades</h3>
+              <p className="text-gray-600 text-sm">Crea y administra las actividades del colegio</p>
             </Link>
             <Link 
               to="/estudiantes" 
@@ -520,8 +520,8 @@ const Dashboard = () => {
               to="/actividades" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-blue-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Actividades</h3>
-              <p className="text-gray-600 text-sm">Ve e inscríbete en actividades</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Actividades del Colegio</h3>
+              <p className="text-gray-600 text-sm">Descubre e inscríbete en actividades</p>
             </Link>
             <Link 
               to="/mis-inscripciones" 
@@ -537,8 +537,8 @@ const Dashboard = () => {
   );
 };
 
-// Página de Gestión de Actividades (Admin Colegio)
-const ActividadesPage = () => {
+// Página de Gestión de Actividades (SOLO Admin Colegio)
+const AdminActividadesPage = () => {
   const [actividades, setActividades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -701,7 +701,313 @@ const ActividadesPage = () => {
   );
 };
 
-// Formulario para crear/editar actividades
+// Página de Actividades para Padres (Vista de Catálogo)
+const ActividadesPadresPage = () => {
+  const [actividades, setActividades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [misHijos, setMisHijos] = useState([]);
+
+  useEffect(() => {
+    loadActividadesDisponibles();
+    loadMisHijos();
+  }, []);
+
+  const loadActividadesDisponibles = async () => {
+    try {
+      // Solo cargar actividades confirmadas
+      const response = await axios.get(`${API}/actividades?estado=confirmada`);
+      setActividades(response.data);
+    } catch (error) {
+      console.error('Error cargando actividades:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMisHijos = async () => {
+    try {
+      const response = await axios.get(`${API}/estudiantes`);
+      setMisHijos(response.data);
+    } catch (error) {
+      console.error('Error cargando hijos:', error);
+    }
+  };
+
+  const handleInscripcion = (actividad) => {
+    setSelectedActivity(actividad);
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Actividades del Colegio">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Actividades del Colegio">
+      <div className="mb-6">
+        <p className="text-gray-600">Descubre las actividades disponibles para tus hijos</p>
+      </div>
+
+      {actividades.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎈</div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No hay actividades disponibles</h3>
+          <p className="text-gray-600">Próximamente habrá nuevas actividades emocionantes</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {actividades.map((actividad) => (
+            <div key={actividad.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+              {/* Imagen placeholder */}
+              <div className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                <div className="text-white text-4xl">🎭</div>
+              </div>
+              
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{actividad.nombre}</h3>
+                <p className="text-gray-600 mb-4 line-clamp-2">{actividad.descripcion}</p>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="mr-2">📅</span>
+                    {new Date(actividad.fecha_inicio).toLocaleDateString('es-ES', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="mr-2">⏰</span>
+                    {new Date(actividad.fecha_inicio).toLocaleTimeString('es-ES', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })} - {new Date(actividad.fecha_fin).toLocaleTimeString('es-ES', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="mr-2">👥</span>
+                    Cursos: {actividad.cursos_participantes.join(', ')}
+                  </div>
+                  {actividad.costo_estudiante > 0 && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <span className="mr-2">💰</span>
+                      ${actividad.costo_estudiante}
+                    </div>
+                  )}
+                  {actividad.cupo_maximo && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <span className="mr-2">🎫</span>
+                      {actividad.participantes_confirmados} / {actividad.cupo_maximo} inscritos
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleInscripcion(actividad)}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-colors font-semibold"
+                >
+                  Ver Detalles e Inscribir
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de detalles e inscripción */}
+      {selectedActivity && (
+        <DetalleInscripcionModal
+          actividad={selectedActivity}
+          misHijos={misHijos}
+          onClose={() => setSelectedActivity(null)}
+          onInscripcion={() => {
+            setSelectedActivity(null);
+            loadActividadesDisponibles();
+          }}
+        />
+      )}
+    </Layout>
+  );
+};
+
+// Modal para detalles e inscripción de actividad
+const DetalleInscripcionModal = ({ actividad, misHijos, onClose, onInscripcion }) => {
+  const [selectedHijo, setSelectedHijo] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleInscribir = async () => {
+    if (!selectedHijo) {
+      setError('Selecciona un hijo para inscribir');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await axios.post(`${API}/inscripciones`, {
+        actividad_id: actividad.id,
+        estudiante_id: selectedHijo,
+        comentarios: 'Inscripción desde interfaz de padres'
+      });
+
+      alert('¡Inscripción exitosa! Recibirás información sobre el pago si es necesario.');
+      onInscripcion();
+    } catch (error) {
+      setError(error.response?.data?.detail || 'Error en la inscripción');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hijoElegible = (hijo) => {
+    return actividad.cursos_participantes.length === 0 || 
+           actividad.cursos_participantes.includes(hijo.curso_grado);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{actividad.nombre}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Imagen de la actividad */}
+          <div className="h-64 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mb-6">
+            <div className="text-white text-6xl">🎭</div>
+          </div>
+
+          <div className="space-y-4 mb-6">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">Descripción</h3>
+              <p className="text-gray-600">{actividad.descripcion}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">📅 Fecha y Hora</h3>
+                <p className="text-gray-600">
+                  {new Date(actividad.fecha_inicio).toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-gray-600">
+                  {new Date(actividad.fecha_inicio).toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })} - {new Date(actividad.fecha_fin).toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">👤 Responsable</h3>
+                <p className="text-gray-600">{actividad.responsable}</p>
+              </div>
+            </div>
+
+            {actividad.materiales_requeridos.length > 0 && (
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">📝 Materiales Necesarios</h3>
+                <ul className="list-disc list-inside text-gray-600">
+                  {actividad.materiales_requeridos.map((material, index) => (
+                    <li key={index}>{material}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {actividad.costo_estudiante > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-800 mb-2">💰 Información de Pago</h3>
+                <p className="text-yellow-700">
+                  Costo por estudiante: <span className="font-bold">${actividad.costo_estudiante}</span>
+                </p>
+                <p className="text-yellow-600 text-sm mt-1">
+                  El pago se procesará después de confirmar la inscripción
+                </p>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          <div className="mb-6">
+            <h3 className="font-semibold text-gray-900 mb-3">Selecciona el hijo a inscribir:</h3>
+            <div className="space-y-2">
+              {misHijos.filter(hijoElegible).map((hijo) => (
+                <label key={hijo.id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="hijo"
+                    value={hijo.id}
+                    checked={selectedHijo === hijo.id}
+                    onChange={(e) => setSelectedHijo(e.target.value)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <div className="font-medium">{hijo.nombre_completo}</div>
+                    <div className="text-sm text-gray-600">{hijo.curso_grado}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            
+            {misHijos.filter(hijoElegible).length === 0 && (
+              <p className="text-gray-500 text-center py-4">
+                Ninguno de tus hijos es elegible para esta actividad (curso no coincide)
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleInscribir}
+              disabled={loading || !selectedHijo || misHijos.filter(hijoElegible).length === 0}
+              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 font-semibold"
+            >
+              {loading ? 'Inscribiendo...' : 'Confirmar Inscripción'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Formulario para crear/editar actividades (SOLO para admin)
 const FormularioActividad = ({ actividad, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     nombre: '',
@@ -1011,11 +1317,22 @@ const App = () => {
             } 
           />
           
+          {/* Rutas para Administrador de Colegio */}
+          <Route 
+            path="/admin/actividades" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <AdminActividadesPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Rutas para Padres */}
           <Route 
             path="/actividades" 
             element={
-              <ProtectedRoute allowedRoles={['admin_colegio', 'padre']}>
-                <ActividadesPage />
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ActividadesPadresPage />
               </ProtectedRoute>
             } 
           />
