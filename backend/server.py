@@ -317,7 +317,14 @@ async def get_estudiantes(current_user: User = Depends(get_current_user)):
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    return [Estudiante(**estudiante) for estudiante in estudiantes]
+    # Convert date strings back to date objects
+    result = []
+    for estudiante in estudiantes:
+        if isinstance(estudiante['fecha_nacimiento'], str):
+            estudiante['fecha_nacimiento'] = datetime.fromisoformat(estudiante['fecha_nacimiento']).date()
+        result.append(Estudiante(**estudiante))
+    
+    return result
 
 # Activity endpoints
 @api_router.post("/actividades", response_model=Activity)
