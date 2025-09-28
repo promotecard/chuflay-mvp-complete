@@ -300,7 +300,12 @@ async def create_estudiante(estudiante_data: EstudianteCreate, current_user: Use
         estudiante_data.colegio_id = current_user.colegio_id
     
     estudiante = Estudiante(**estudiante_data.dict())
-    await db.estudiantes.insert_one(estudiante.dict())
+    
+    # Convert date to string for MongoDB
+    estudiante_dict = estudiante.dict()
+    estudiante_dict['fecha_nacimiento'] = estudiante_dict['fecha_nacimiento'].isoformat()
+    
+    await db.estudiantes.insert_one(estudiante_dict)
     return estudiante
 
 @api_router.get("/estudiantes", response_model=List[Estudiante])
