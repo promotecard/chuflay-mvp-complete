@@ -477,22 +477,19 @@ async def update_colegio_global(colegio_id: str, update_data: ColegioUpdate, cur
     if current_user.role != UserRole.ADMIN_GLOBAL:
         raise HTTPException(status_code=403, detail="Only global admins can update colleges")
     
+    # First, get the original college to ensure it exists
+    original_college = await db.colegios.find_one({"id": colegio_id})
+    if not original_college:
+        raise HTTPException(status_code=404, detail="College not found")
+    
     update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
     update_dict["updated_at"] = datetime.utcnow()
     
     result = await db.colegios.update_one({"id": colegio_id}, {"$set": update_dict})
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="College not found")
+        raise HTTPException(status_code=404, detail="College not found during update")
     
-    # Since the update was successful, we can construct the response from the original data + updates
-    # This avoids the mysterious issue with find_one after update
-    original_college = await db.colegios.find_one({"id": colegio_id})
-    if not original_college:
-        # If we still can't find it, there's a deeper issue, but the update worked
-        # Let's return a minimal response indicating success
-        raise HTTPException(status_code=500, detail="Update succeeded but college retrieval failed")
-    
-    # Apply the updates to the original data
+    # Apply the updates to the original data and return
     for key, value in update_dict.items():
         original_college[key] = value
     
