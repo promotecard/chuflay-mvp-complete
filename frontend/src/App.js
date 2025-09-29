@@ -339,7 +339,7 @@ const LoginPage = () => {
   );
 };
 
-// Componente de Registro (mantenido igual)
+// Componente de Registro
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -515,7 +515,7 @@ const RegisterPage = () => {
   );
 };
 
-// Dashboard actualizado con nuevas estadísticas
+// Dashboard actualizado con nuevas estadísticas y navegación por roles
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({});
@@ -566,20 +566,53 @@ const Dashboard = () => {
 
       {/* Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {user.role === 'admin_global' && (
+          <>
+            <Link 
+              to="/global/colegios" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-purple-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">🏫 Gestión de Colegios</h3>
+              <p className="text-gray-600 text-sm">Administra todos los colegios de la plataforma</p>
+            </Link>
+            <Link 
+              to="/global/reportes" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-indigo-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📊 Reportes Globales</h3>
+              <p className="text-gray-600 text-sm">Analytics y métricas de toda la plataforma</p>
+            </Link>
+            <Link 
+              to="/global/suscripciones" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-green-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">💎 Suscripciones</h3>
+              <p className="text-gray-600 text-sm">Gestiona planes y facturación de colegios</p>
+            </Link>
+            <Link 
+              to="/global/usuarios" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-red-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">👥 Gestión de Usuarios</h3>
+              <p className="text-gray-600 text-sm">Administra usuarios de todos los colegios</p>
+            </Link>
+          </>
+        )}
+
         {user.role === 'admin_colegio' && (
           <>
             <Link 
               to="/admin/actividades" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-blue-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Gestión de Actividades</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">🎯 Gestión de Actividades</h3>
               <p className="text-gray-600 text-sm">Crea y administra las actividades del colegio</p>
             </Link>
             <Link 
               to="/admin/estudiantes" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-green-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Gestión de Estudiantes</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">👥 Gestión de Estudiantes</h3>
               <p className="text-gray-600 text-sm">Administra los estudiantes del colegio</p>
             </Link>
             <Link 
@@ -593,8 +626,22 @@ const Dashboard = () => {
               to="/admin/inscripciones" 
               className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-yellow-500"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Inscripciones</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📋 Inscripciones</h3>
               <p className="text-gray-600 text-sm">Ve las inscripciones a actividades</p>
+            </Link>
+            <Link 
+              to="/admin/reportes" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-indigo-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📈 Reportes</h3>
+              <p className="text-gray-600 text-sm">Reportes y estadísticas del colegio</p>
+            </Link>
+            <Link 
+              to="/admin/comunicacion" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-pink-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📢 Comunicación</h3>
+              <p className="text-gray-600 text-sm">Circulares y comunicados</p>
             </Link>
           </>
         )}
@@ -629,6 +676,20 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">💳 Mis Pagos</h3>
               <p className="text-gray-600 text-sm">Gestiona los pagos de actividades</p>
             </Link>
+            <Link 
+              to="/comunicados" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-pink-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📢 Comunicados</h3>
+              <p className="text-gray-600 text-sm">Lee circulares y comunicados del colegio</p>
+            </Link>
+            <Link 
+              to="/calendario" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-yellow-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📅 Calendario</h3>
+              <p className="text-gray-600 text-sm">Ve el calendario escolar y eventos</p>
+            </Link>
           </>
         )}
       </div>
@@ -636,7 +697,7 @@ const Dashboard = () => {
   );
 };
 
-// Página "Mis Pagos" para Padres
+// Página "Mis Pagos" para Padres - COMPLETA
 const MisPagosPage = () => {
   const [pagos, setPagos] = useState([]);
   const [inscripciones, setInscripciones] = useState({});
@@ -879,7 +940,7 @@ const MisPagosPage = () => {
   );
 };
 
-// Modal de Pago
+// Modal de Pago - COMPLETO
 const ModalPago = ({ inscripcion, actividad, estudiante, onClose, onSuccess }) => {
   const [metodoPago, setMetodoPago] = useState('tarjeta');
   const [loading, setLoading] = useState(false);
@@ -1100,6 +1161,7 @@ const ModalPago = ({ inscripcion, actividad, estudiante, onClose, onSuccess }) =
                 type="submit"
                 disabled={loading}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
+                data-testid="confirmar-pago-btn"
               >
                 {loading ? 'Procesando...' : `Pagar $${actividad.costo_estudiante}`}
               </button>
@@ -1111,10 +1173,18 @@ const ModalPago = ({ inscripcion, actividad, estudiante, onClose, onSuccess }) =
   );
 };
 
-// Resto de componentes mantenidos iguales por brevedad...
-// (ActividadesPadresPage, MisInscripcionesPage, MisHijosPage, etc.)
+// Página temporal para rutas no implementadas
+const ComingSoon = ({ title }) => (
+  <Layout title={title}>
+    <div className="text-center py-12">
+      <div className="text-6xl mb-4">🚧</div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">En Desarrollo</h2>
+      <p className="text-gray-600">Esta funcionalidad estará disponible pronto</p>
+    </div>
+  </Layout>
+);
 
-// Solo agregando el export default
+// Componente principal de la aplicación
 const App = () => {
   return (
     <AuthProvider>
@@ -1131,13 +1201,145 @@ const App = () => {
               </ProtectedRoute>
             } 
           />
+
+          {/* Rutas Admin Global */}
+          <Route 
+            path="/global/colegios" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_global']}>
+                <ComingSoon title="Gestión de Colegios" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/global/reportes" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_global']}>
+                <ComingSoon title="Reportes Globales" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/global/suscripciones" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_global']}>
+                <ComingSoon title="Suscripciones" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/global/usuarios" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_global']}>
+                <ComingSoon title="Gestión de Usuarios" />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Rutas para Administrador de Colegio */}
+          <Route 
+            path="/admin/actividades" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Gestión de Actividades" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/estudiantes" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Gestión de Estudiantes" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/pagos" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Gestión de Pagos" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/inscripciones" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Gestión de Inscripciones" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/reportes" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Reportes" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/comunicacion" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <ComingSoon title="Comunicación" />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Rutas para Padres */}
+          <Route 
+            path="/actividades" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ComingSoon title="Actividades del Colegio" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/mis-hijos" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ComingSoon title="Mis Hijos" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/mis-inscripciones" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ComingSoon title="Mis Inscripciones" />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/mis-pagos" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
                 <MisPagosPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/comunicados" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ComingSoon title="Comunicados" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/calendario" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <ComingSoon title="Calendario" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notificaciones" 
+            element={
+              <ProtectedRoute>
+                <ComingSoon title="Notificaciones" />
               </ProtectedRoute>
             } 
           />
