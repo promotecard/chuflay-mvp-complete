@@ -146,15 +146,18 @@ backend:
 
   - task: "Global Admin Functionalities"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Multiple Global Admin endpoints found with role checks, needs comprehensive testing"
+      - working: true
+        agent: "testing"
+        comment: "All Global Admin functionalities tested and working: College management (create, read, update), User management (list all users, impersonate users), Global statistics endpoint, Subscription management (create, list subscriptions). Role-based access control properly enforced - non-global admins correctly denied access. Fixed minor bug in college update endpoint. All 21 comprehensive tests passed."
 
   - task: "Enrollment System"
     implemented: true
