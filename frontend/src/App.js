@@ -2514,7 +2514,7 @@ const App = () => {
             path="/admin/actividades" 
             element={
               <ProtectedRoute allowedRoles={['admin_colegio']}>
-                <ComingSoon title="Gestión de Actividades" />
+                <AdminActividades />
               </ProtectedRoute>
             } 
           />
