@@ -131,15 +131,18 @@ backend:
 
   - task: "Image Upload for Activities"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Image upload endpoint (@api_router.post('/upload/imagen')) found in code, needs testing"
+      - working: true
+        agent: "testing"
+        comment: "Image upload system fully tested and working. Successfully uploads valid images to /uploads directory, correctly rejects non-image files with 400 error, requires authentication, and returns proper URL format. Tested with PNG files and text files for validation."
 
   - task: "Global Admin Functionalities"
     implemented: true
