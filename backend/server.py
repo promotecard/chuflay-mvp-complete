@@ -485,6 +485,8 @@ async def update_colegio_global(colegio_id: str, update_data: ColegioUpdate, cur
         raise HTTPException(status_code=404, detail="College not found")
     
     updated_colegio = await db.colegios.find_one({"id": colegio_id})
+    if not updated_colegio:
+        raise HTTPException(status_code=404, detail="College not found after update")
     return Colegio(**updated_colegio)
 
 @api_router.get("/global/usuarios", response_model=List[UserResponse])
