@@ -1961,7 +1961,7 @@ const App = () => {
             path="/global/colegios" 
             element={
               <ProtectedRoute allowedRoles={['admin_global']}>
-                <ComingSoon title="Gestión de Colegios" />
+                <GlobalColegios />
               </ProtectedRoute>
             } 
           />
@@ -1969,7 +1969,7 @@ const App = () => {
             path="/global/reportes" 
             element={
               <ProtectedRoute allowedRoles={['admin_global']}>
-                <ComingSoon title="Reportes Globales" />
+                <GlobalReportes />
               </ProtectedRoute>
             } 
           />
@@ -1977,7 +1977,7 @@ const App = () => {
             path="/global/suscripciones" 
             element={
               <ProtectedRoute allowedRoles={['admin_global']}>
-                <ComingSoon title="Suscripciones" />
+                <GlobalSuscripciones />
               </ProtectedRoute>
             } 
           />
@@ -1985,7 +1985,7 @@ const App = () => {
             path="/global/usuarios" 
             element={
               <ProtectedRoute allowedRoles={['admin_global']}>
-                <ComingSoon title="Gestión de Usuarios" />
+                <GlobalUsuarios />
               </ProtectedRoute>
             } 
           />
