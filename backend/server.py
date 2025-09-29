@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -13,6 +13,7 @@ from datetime import datetime, date
 from enum import Enum
 import jwt
 from passlib.context import CryptContext
+import shutil
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -33,6 +34,10 @@ security = HTTPBearer()
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 SECRET_KEY = os.environ.get("JWT_SECRET", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
+
+# Create uploads directory
+UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Enums
 class UserRole(str, Enum):
@@ -71,6 +76,17 @@ class PaymentStatus(str, Enum):
     COMPLETADO = "completado"
     FALLIDO = "fallido"
     REEMBOLSADO = "reembolsado"
+
+class SubscriptionPlan(str, Enum):
+    BASICO = "basico"
+    PREMIUM = "premium"
+    ENTERPRISE = "enterprise"
+
+class SubscriptionStatus(str, Enum):
+    ACTIVO = "activo"
+    SUSPENDIDO = "suspendido"
+    CANCELADO = "cancelado"
+    VENCIDO = "vencido"
 
 # Base Models
 class BaseModel(BaseModel):
@@ -116,6 +132,10 @@ class Colegio(BaseModel):
     email_oficial: Optional[str] = None
     director: Optional[str] = None
     estado: str = "activo"
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    plan_suscripcion: SubscriptionPlan = SubscriptionPlan.BASICO
+    fecha_vencimiento: Optional[datetime] = None
+    configuracion: Optional[Dict[str, Any]] = None
 
 class ColegioCreate(BaseModel):
     nombre: str
@@ -125,6 +145,37 @@ class ColegioCreate(BaseModel):
     telefono: Optional[str] = None
     email_oficial: Optional[str] = None
     director: Optional[str] = None
+    plan_suscripcion: SubscriptionPlan = SubscriptionPlan.BASICO
+
+class ColegioUpdate(BaseModel):
+    nombre: Optional[str] = None
+    rnc: Optional[str] = None
+    direccion: Optional[str] = None
+    ciudad: Optional[str] = None
+    telefono: Optional[str] = None
+    email_oficial: Optional[str] = None
+    director: Optional[str] = None
+    estado: Optional[str] = None
+    plan_suscripcion: Optional[SubscriptionPlan] = None
+    fecha_vencimiento: Optional[datetime] = None
+
+# Subscription Models
+class Subscription(BaseModel):
+    colegio_id: str
+    plan: SubscriptionPlan
+    estado: SubscriptionStatus = SubscriptionStatus.ACTIVO
+    fecha_inicio: datetime = Field(default_factory=datetime.utcnow)
+    fecha_vencimiento: datetime
+    precio_mensual: float
+    caracteristicas: List[str] = []
+    limite_estudiantes: Optional[int] = None
+    limite_actividades: Optional[int] = None
+
+class SubscriptionCreate(BaseModel):
+    colegio_id: str
+    plan: SubscriptionPlan
+    meses: int = 12
+    precio_mensual: float
 
 # Student Models
 class Estudiante(BaseModel):
@@ -143,7 +194,17 @@ class EstudianteCreate(BaseModel):
     colegio_id: Optional[str] = None
     padre_id: Optional[str] = None
 
-# Activity Models
+# Custom Form Field Models
+class FormField(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nombre: str
+    tipo: str  # text, email, number, select, textarea, checkbox, date
+    requerido: bool = False
+    opciones: Optional[List[str]] = None  # Para campos select
+    placeholder: Optional[str] = None
+    validacion: Optional[Dict[str, Any]] = None
+
+# Activity Models con campos personalizados
 class Activity(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -163,6 +224,13 @@ class Activity(BaseModel):
     requiere_validacion_manual: bool = False
     galeria_urls: List[str] = []
     participantes_confirmados: int = 0
+    # Nuevos campos
+    imagen_actividad: Optional[str] = None  # URL de la imagen principal
+    campos_personalizados: List[FormField] = []  # Campos adicionales tipo Google Forms
+    ubicacion: Optional[str] = None
+    instructor: Optional[str] = None
+    edad_minima: Optional[int] = None
+    edad_maxima: Optional[int] = None
 
 class ActivityCreate(BaseModel):
     nombre: str
@@ -178,6 +246,13 @@ class ActivityCreate(BaseModel):
     metodos_pago: List[PaymentMethod] = []
     es_permanente: bool = False
     requiere_validacion_manual: bool = False
+    # Nuevos campos
+    imagen_actividad: Optional[str] = None
+    campos_personalizados: List[FormField] = []
+    ubicacion: Optional[str] = None
+    instructor: Optional[str] = None
+    edad_minima: Optional[int] = None
+    edad_maxima: Optional[int] = None
 
 class ActivityUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -192,8 +267,12 @@ class ActivityUpdate(BaseModel):
     estado: Optional[ActivityStatus] = None
     responsable: Optional[str] = None
     metodos_pago: Optional[List[PaymentMethod]] = None
+    imagen_actividad: Optional[str] = None
+    campos_personalizados: Optional[List[FormField]] = None
+    ubicacion: Optional[str] = None
+    instructor: Optional[str] = None
 
-# Inscription Models
+# Inscription Models con campos personalizados
 class Inscription(BaseModel):
     actividad_id: str
     estudiante_id: str
@@ -204,11 +283,13 @@ class Inscription(BaseModel):
     metodo_pago_usado: Optional[PaymentMethod] = None
     fecha_pago: Optional[datetime] = None
     comentarios: Optional[str] = None
+    respuestas_campos: Optional[Dict[str, Any]] = None  # Respuestas a campos personalizados
 
 class InscriptionCreate(BaseModel):
     actividad_id: str
     estudiante_id: str
     comentarios: Optional[str] = None
+    respuestas_campos: Optional[Dict[str, Any]] = None
 
 # Payment Models
 class Payment(BaseModel):
@@ -220,7 +301,7 @@ class Payment(BaseModel):
     metodo_pago: PaymentMethod
     estado: PaymentStatus = PaymentStatus.PENDIENTE
     referencia_pago: Optional[str] = None
-    datos_pago: Optional[Dict[str, Any]] = None  # Para guardar detalles específicos del método
+    datos_pago: Optional[Dict[str, Any]] = None
     fecha_procesado: Optional[datetime] = None
     notas: Optional[str] = None
 
@@ -240,7 +321,7 @@ class PaymentUpdate(BaseModel):
 class Notification(BaseModel):
     titulo: str
     mensaje: str
-    tipo: str = "general"  # general, pago, actividad, inscripcion
+    tipo: str = "general"
     destinatario_id: str
     destinatario_role: UserRole
     leida: bool = False
@@ -258,6 +339,28 @@ class NotificationCreate(BaseModel):
     actividad_id: Optional[str] = None
     inscripcion_id: Optional[str] = None
     pago_id: Optional[str] = None
+
+# Communication Models
+class Circular(BaseModel):
+    titulo: str
+    contenido: str
+    colegio_id: str
+    autor_id: str
+    dirigida_a: List[UserRole] = []  # Lista de roles a los que va dirigida
+    cursos_objetivo: List[str] = []  # Cursos específicos
+    fecha_publicacion: datetime = Field(default_factory=datetime.utcnow)
+    adjuntos: List[str] = []
+    prioridad: str = "normal"  # normal, alta, urgente
+    requiere_confirmacion: bool = False
+
+class CircularCreate(BaseModel):
+    titulo: str
+    contenido: str
+    dirigida_a: List[UserRole] = []
+    cursos_objetivo: List[str] = []
+    adjuntos: List[str] = []
+    prioridad: str = "normal"
+    requiere_confirmacion: bool = False
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -292,15 +395,32 @@ async def create_notification(notification_data: NotificationCreate, colegio_id:
     await db.notifications.insert_one(notification.dict())
     return notification
 
-# Auth endpoints
+# File Upload endpoints
+@api_router.post("/upload/imagen")
+async def upload_image(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    """Subir imagen para actividades"""
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Generar nombre único
+    file_extension = file.filename.split('.')[-1]
+    unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
+    file_path = UPLOAD_DIR / unique_filename
+    
+    # Guardar archivo
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Retornar URL pública
+    return {"url": f"/uploads/{unique_filename}"}
+
+# Auth endpoints (mantener igual)
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register_user(user_data: UserCreate):
-    # Check if user already exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create user
     hashed_password = hash_password(user_data.password)
     user = User(
         email=user_data.email,
@@ -331,7 +451,143 @@ async def login_user(user_data: UserLogin):
         "user": user_response
     }
 
-# Colegio endpoints
+# ADMIN GLOBAL ENDPOINTS
+@api_router.get("/global/colegios", response_model=List[Colegio])
+async def get_all_colegios(current_user: User = Depends(get_current_user)):
+    """Ver todos los colegios (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can access this")
+    
+    colegios = await db.colegios.find().to_list(1000)
+    return [Colegio(**colegio) for colegio in colegios]
+
+@api_router.post("/global/colegios", response_model=Colegio)
+async def create_colegio_global(colegio_data: ColegioCreate, current_user: User = Depends(get_current_user)):
+    """Crear colegio (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can create colleges")
+    
+    colegio = Colegio(**colegio_data.dict())
+    await db.colegios.insert_one(colegio.dict())
+    return colegio
+
+@api_router.put("/global/colegios/{colegio_id}", response_model=Colegio)
+async def update_colegio_global(colegio_id: str, update_data: ColegioUpdate, current_user: User = Depends(get_current_user)):
+    """Actualizar colegio (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can update colleges")
+    
+    update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow()
+    
+    result = await db.colegios.update_one({"id": colegio_id}, {"$set": update_dict})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="College not found")
+    
+    updated_colegio = await db.colegios.find_one({"id": colegio_id})
+    return Colegio(**updated_colegio)
+
+@api_router.get("/global/usuarios", response_model=List[UserResponse])
+async def get_all_users(current_user: User = Depends(get_current_user)):
+    """Ver todos los usuarios (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can access this")
+    
+    users = await db.users.find().to_list(1000)
+    return [UserResponse(**user) for user in users]
+
+@api_router.post("/global/impersonate/{user_id}")
+async def impersonate_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """Impersonar usuario (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can impersonate users")
+    
+    target_user = await db.users.find_one({"id": user_id})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Crear token para el usuario objetivo
+    access_token = create_access_token({"sub": target_user["id"], "role": target_user["role"], "impersonated_by": current_user.id})
+    user_response = UserResponse(**target_user)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_response,
+        "impersonated": True,
+        "impersonated_by": current_user.full_name
+    }
+
+@api_router.get("/global/estadisticas")
+async def get_global_stats(current_user: User = Depends(get_current_user)):
+    """Estadísticas globales (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can access global stats")
+    
+    stats = {
+        "total_colegios": await db.colegios.count_documents({}),
+        "colegios_activos": await db.colegios.count_documents({"estado": "activo"}),
+        "total_usuarios": await db.users.count_documents({}),
+        "total_estudiantes": await db.estudiantes.count_documents({}),
+        "total_actividades": await db.actividades.count_documents({}),
+        "total_inscripciones": await db.inscripciones.count_documents({}),
+        "total_pagos": await db.pagos.count_documents({}),
+    }
+    
+    # Estadísticas por plan
+    planes_stats = {}
+    for plan in SubscriptionPlan:
+        planes_stats[f"colegios_{plan.value}"] = await db.colegios.count_documents({"plan_suscripcion": plan.value})
+    
+    return {**stats, **planes_stats}
+
+# Suscriptions endpoints
+@api_router.post("/global/suscripciones", response_model=Subscription)
+async def create_subscription(subscription_data: SubscriptionCreate, current_user: User = Depends(get_current_user)):
+    """Crear suscripción (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can create subscriptions")
+    
+    # Calcular fecha de vencimiento
+    from datetime import timedelta
+    fecha_vencimiento = datetime.utcnow() + timedelta(days=subscription_data.meses * 30)
+    
+    # Definir características por plan
+    caracteristicas_por_plan = {
+        SubscriptionPlan.BASICO: ["Hasta 100 estudiantes", "Actividades básicas", "Soporte por email"],
+        SubscriptionPlan.PREMIUM: ["Hasta 500 estudiantes", "Actividades avanzadas", "Reportes", "Soporte prioritario"],
+        SubscriptionPlan.ENTERPRISE: ["Estudiantes ilimitados", "Todas las funcionalidades", "API access", "Soporte 24/7"]
+    }
+    
+    subscription = Subscription(
+        colegio_id=subscription_data.colegio_id,
+        plan=subscription_data.plan,
+        fecha_vencimiento=fecha_vencimiento,
+        precio_mensual=subscription_data.precio_mensual,
+        caracteristicas=caracteristicas_por_plan.get(subscription_data.plan, []),
+        limite_estudiantes=100 if subscription_data.plan == SubscriptionPlan.BASICO else 500 if subscription_data.plan == SubscriptionPlan.PREMIUM else None
+    )
+    
+    await db.subscriptions.insert_one(subscription.dict())
+    
+    # Actualizar el colegio con el plan
+    await db.colegios.update_one(
+        {"id": subscription_data.colegio_id},
+        {"$set": {"plan_suscripcion": subscription_data.plan, "fecha_vencimiento": fecha_vencimiento}}
+    )
+    
+    return subscription
+
+@api_router.get("/global/suscripciones", response_model=List[Subscription])
+async def get_all_subscriptions(current_user: User = Depends(get_current_user)):
+    """Ver todas las suscripciones (Solo Admin Global)"""
+    if current_user.role != UserRole.ADMIN_GLOBAL:
+        raise HTTPException(status_code=403, detail="Only global admins can access subscriptions")
+    
+    subscriptions = await db.subscriptions.find().to_list(1000)
+    return [Subscription(**sub) for sub in subscriptions]
+
+# Colegio endpoints (mantener y mejorar)
 @api_router.post("/colegios", response_model=Colegio)
 async def create_colegio(colegio_data: ColegioCreate, current_user: User = Depends(get_current_user)):
     if current_user.role not in [UserRole.ADMIN_GLOBAL, UserRole.ADMIN_COLEGIO]:
@@ -350,20 +606,21 @@ async def get_colegios(current_user: User = Depends(get_current_user)):
     
     return [Colegio(**colegio) for colegio in colegios]
 
-# Student endpoints
+# Resto de endpoints (mantener igual pero con mejoras)
+# [Todos los endpoints anteriores de estudiantes, actividades, inscripciones, pagos, notificaciones, etc.]
+# Por brevedad, mantengo la estructura anterior pero con las mejoras mencionadas
+
+# Student endpoints (mantener igual)
 @api_router.post("/estudiantes", response_model=Estudiante)
 async def create_estudiante(estudiante_data: EstudianteCreate, current_user: User = Depends(get_current_user)):
     if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.PADRE]:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    # If padre creating, set padre_id automatically
     if current_user.role == UserRole.PADRE:
         estudiante_data.padre_id = current_user.id
         estudiante_data.colegio_id = current_user.colegio_id
     
     estudiante = Estudiante(**estudiante_data.dict())
-    
-    # Convert date to string for MongoDB
     estudiante_dict = estudiante.dict()
     estudiante_dict['fecha_nacimiento'] = estudiante_dict['fecha_nacimiento'].isoformat()
     
@@ -379,7 +636,6 @@ async def get_estudiantes(current_user: User = Depends(get_current_user)):
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    # Convert date strings back to date objects
     result = []
     for estudiante in estudiantes:
         if isinstance(estudiante['fecha_nacimiento'], str):
@@ -388,7 +644,7 @@ async def get_estudiantes(current_user: User = Depends(get_current_user)):
     
     return result
 
-# Activity endpoints
+# Activity endpoints mejorados
 @api_router.post("/actividades", response_model=Activity)
 async def create_activity(activity_data: ActivityCreate, current_user: User = Depends(get_current_user)):
     if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.PROFESOR]:
@@ -396,7 +652,6 @@ async def create_activity(activity_data: ActivityCreate, current_user: User = De
     
     activity = Activity(**activity_data.dict(), colegio_id=current_user.colegio_id)
     
-    # Generate public link if external or mixed
     if activity.visibilidad in [ActivityVisibility.EXTERNA, ActivityVisibility.MIXTA]:
         activity.link_inscripcion = f"/inscripcion/{activity.id}"
     
@@ -415,7 +670,6 @@ async def get_activities(
         filter_query["colegio_id"] = current_user.colegio_id
     elif current_user.role == UserRole.PADRE:
         filter_query["colegio_id"] = current_user.colegio_id
-        # Only show activities where visibility is not just external
         filter_query["visibilidad"] = {"$in": [ActivityVisibility.INTERNA, ActivityVisibility.MIXTA]}
     
     if curso:
@@ -432,7 +686,6 @@ async def get_activity(activity_id: str, current_user: User = Depends(get_curren
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     
-    # Check permissions
     if current_user.role in [UserRole.ADMIN_COLEGIO, UserRole.PROFESOR]:
         if activity["colegio_id"] != current_user.colegio_id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -455,7 +708,6 @@ async def update_activity(
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     
-    # Update only provided fields
     update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
     update_dict["updated_at"] = datetime.utcnow()
     
@@ -480,13 +732,12 @@ async def delete_activity(activity_id: str, current_user: User = Depends(get_cur
     
     return {"message": "Activity deleted successfully"}
 
-# Inscription endpoints
+# Inscription endpoints mejorados con campos personalizados
 @api_router.post("/inscripciones", response_model=Inscription)
 async def create_inscription(inscription_data: InscriptionCreate, current_user: User = Depends(get_current_user)):
     if current_user.role != UserRole.PADRE:
         raise HTTPException(status_code=403, detail="Only parents can inscribe students")
     
-    # Verify student belongs to current user
     estudiante = await db.estudiantes.find_one({
         "id": inscription_data.estudiante_id,
         "padre_id": current_user.id
@@ -494,12 +745,10 @@ async def create_inscription(inscription_data: InscriptionCreate, current_user: 
     if not estudiante:
         raise HTTPException(status_code=404, detail="Student not found or not authorized")
     
-    # Verify activity exists and is available
     activity = await db.actividades.find_one({"id": inscription_data.actividad_id})
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     
-    # Check if already inscribed
     existing_inscription = await db.inscripciones.find_one({
         "actividad_id": inscription_data.actividad_id,
         "estudiante_id": inscription_data.estudiante_id
@@ -507,7 +756,6 @@ async def create_inscription(inscription_data: InscriptionCreate, current_user: 
     if existing_inscription:
         raise HTTPException(status_code=400, detail="Student already inscribed")
     
-    # Check cupo
     if activity.get("cupo_maximo"):
         current_inscriptions = await db.inscripciones.count_documents({
             "actividad_id": inscription_data.actividad_id,
@@ -525,7 +773,6 @@ async def create_inscription(inscription_data: InscriptionCreate, current_user: 
     
     await db.inscripciones.insert_one(inscription.dict())
     
-    # Crear notificación para el padre
     await create_notification(
         NotificationCreate(
             titulo="Inscripción Realizada",
@@ -556,13 +803,15 @@ async def get_inscriptions(current_user: User = Depends(get_current_user)):
     inscriptions = await db.inscripciones.find(filter_query).to_list(1000)
     return [Inscription(**inscription) for inscription in inscriptions]
 
-# Payment endpoints
+# Mantener todos los demás endpoints de pagos, notificaciones, dashboard, etc.
+# (Por brevedad del código, mantengo la misma estructura pero con las mejoras mencionadas)
+
+# Payment endpoints (mantener igual)
 @api_router.post("/pagos", response_model=Payment)
 async def create_payment(payment_data: PaymentCreate, current_user: User = Depends(get_current_user)):
     if current_user.role != UserRole.PADRE:
         raise HTTPException(status_code=403, detail="Only parents can make payments")
     
-    # Verificar que la inscripción existe y pertenece al padre
     inscription = await db.inscripciones.find_one({
         "id": payment_data.inscripcion_id,
         "padre_id": current_user.id
@@ -570,17 +819,14 @@ async def create_payment(payment_data: PaymentCreate, current_user: User = Depen
     if not inscription:
         raise HTTPException(status_code=404, detail="Inscription not found")
     
-    # Obtener información de la actividad
     activity = await db.actividades.find_one({"id": inscription["actividad_id"]})
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     
-    # Verificar que el pago no existe ya
     existing_payment = await db.pagos.find_one({"inscripcion_id": payment_data.inscripcion_id})
     if existing_payment:
         raise HTTPException(status_code=400, detail="Payment already exists for this inscription")
     
-    # Crear el pago
     payment = Payment(
         inscripcion_id=payment_data.inscripcion_id,
         actividad_id=inscription["actividad_id"],
@@ -595,23 +841,17 @@ async def create_payment(payment_data: PaymentCreate, current_user: User = Depen
     
     await db.pagos.insert_one(payment.dict())
     
-    # Simular procesamiento según el método de pago
     if payment_data.metodo_pago == PaymentMethod.EFECTIVO:
-        # Efectivo queda pendiente hasta confirmación del admin
         payment.estado = PaymentStatus.PENDIENTE
         await db.pagos.update_one({"id": payment.id}, {"$set": {"estado": PaymentStatus.PENDIENTE}})
-        
         notification_msg = f"Pago en efectivo registrado. Entrega ${activity['costo_estudiante']} en el colegio con referencia {payment.referencia_pago}"
         
     elif payment_data.metodo_pago == PaymentMethod.TRANSFERENCIA:
-        # Transferencia queda pendiente hasta validación
         payment.estado = PaymentStatus.PENDIENTE
         await db.pagos.update_one({"id": payment.id}, {"$set": {"estado": PaymentStatus.PENDIENTE}})
-        
         notification_msg = f"Pago por transferencia registrado. Envía ${activity['costo_estudiante']} con referencia {payment.referencia_pago}"
         
     else:  # TARJETA
-        # Simular pago exitoso inmediato con tarjeta
         payment.estado = PaymentStatus.COMPLETADO
         payment.fecha_procesado = datetime.utcnow()
         await db.pagos.update_one({"id": payment.id}, {"$set": {
@@ -619,7 +859,6 @@ async def create_payment(payment_data: PaymentCreate, current_user: User = Depen
             "fecha_procesado": datetime.utcnow()
         }})
         
-        # Actualizar inscripción como confirmada
         await db.inscripciones.update_one(
             {"id": payment_data.inscripcion_id},
             {"$set": {
@@ -632,7 +871,6 @@ async def create_payment(payment_data: PaymentCreate, current_user: User = Depen
         
         notification_msg = f"¡Pago completado! Tu hijo está confirmado en '{activity['nombre']}'"
     
-    # Crear notificación para el padre
     await create_notification(
         NotificationCreate(
             titulo="Pago Procesado",
@@ -656,7 +894,6 @@ async def get_payments(current_user: User = Depends(get_current_user)):
     if current_user.role == UserRole.PADRE:
         filter_query["padre_id"] = current_user.id
     elif current_user.role in [UserRole.ADMIN_COLEGIO]:
-        # Admin ve todos los pagos del colegio
         inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
         inscripcion_ids = [i["id"] for i in inscripciones]
         filter_query["inscripcion_id"] = {"$in": inscripcion_ids}
@@ -668,7 +905,6 @@ async def get_payments(current_user: User = Depends(get_current_user)):
 
 @api_router.put("/pagos/{payment_id}/confirmar")
 async def confirm_payment(payment_id: str, current_user: User = Depends(get_current_user)):
-    """Confirmar pago (solo para administradores)"""
     if current_user.role != UserRole.ADMIN_COLEGIO:
         raise HTTPException(status_code=403, detail="Only administrators can confirm payments")
     
@@ -676,7 +912,6 @@ async def confirm_payment(payment_id: str, current_user: User = Depends(get_curr
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Verificar que el pago pertenece a una inscripción del colegio del admin
     inscription = await db.inscripciones.find_one({
         "id": payment["inscripcion_id"],
         "colegio_id": current_user.colegio_id
@@ -684,7 +919,6 @@ async def confirm_payment(payment_id: str, current_user: User = Depends(get_curr
     if not inscription:
         raise HTTPException(status_code=403, detail="Payment not found in your college")
     
-    # Actualizar estado del pago
     await db.pagos.update_one(
         {"id": payment_id},
         {"$set": {
@@ -693,7 +927,6 @@ async def confirm_payment(payment_id: str, current_user: User = Depends(get_curr
         }}
     )
     
-    # Actualizar inscripción como confirmada
     activity = await db.actividades.find_one({"id": inscription["actividad_id"]})
     await db.inscripciones.update_one(
         {"id": payment["inscripcion_id"]},
@@ -705,7 +938,6 @@ async def confirm_payment(payment_id: str, current_user: User = Depends(get_curr
         }}
     )
     
-    # Notificar al padre
     await create_notification(
         NotificationCreate(
             titulo="¡Pago Confirmado!",
@@ -722,7 +954,7 @@ async def confirm_payment(payment_id: str, current_user: User = Depends(get_curr
     
     return {"message": "Payment confirmed successfully"}
 
-# Notification endpoints
+# Notification endpoints (mantener igual)
 @api_router.get("/notificaciones", response_model=List[Notification])
 async def get_notifications(current_user: User = Depends(get_current_user)):
     notifications = await db.notifications.find({
@@ -743,12 +975,65 @@ async def mark_notification_read(notification_id: str, current_user: User = Depe
     
     return {"message": "Notification marked as read"}
 
-# Dashboard endpoints
+# Communication endpoints
+@api_router.post("/circulares", response_model=Circular)
+async def create_circular(circular_data: CircularCreate, current_user: User = Depends(get_current_user)):
+    """Crear circular (Solo Admin Colegio)"""
+    if current_user.role != UserRole.ADMIN_COLEGIO:
+        raise HTTPException(status_code=403, detail="Only college admins can create circulars")
+    
+    circular = Circular(
+        **circular_data.dict(),
+        colegio_id=current_user.colegio_id,
+        autor_id=current_user.id
+    )
+    
+    await db.circulares.insert_one(circular.dict())
+    
+    # Crear notificaciones para los destinatarios
+    destinatarios_query = {}
+    if circular_data.dirigida_a:
+        destinatarios_query["role"] = {"$in": circular_data.dirigida_a}
+    
+    if current_user.colegio_id:
+        destinatarios_query["colegio_id"] = current_user.colegio_id
+    
+    destinatarios = await db.users.find(destinatarios_query).to_list(1000)
+    
+    for destinatario in destinatarios:
+        await create_notification(
+            NotificationCreate(
+                titulo=f"Nueva Circular: {circular.titulo}",
+                mensaje=f"Se ha publicado una nueva circular. Prioridad: {circular.prioridad}",
+                tipo="comunicado",
+                destinatario_id=destinatario["id"],
+                destinatario_role=UserRole(destinatario["role"])
+            ),
+            current_user.colegio_id
+        )
+    
+    return circular
+
+@api_router.get("/circulares", response_model=List[Circular])
+async def get_circulares(current_user: User = Depends(get_current_user)):
+    """Obtener circulares"""
+    filter_query = {"colegio_id": current_user.colegio_id}
+    
+    if current_user.role != UserRole.ADMIN_COLEGIO:
+        # Los no-admin solo ven las dirigidas a su rol
+        filter_query["dirigida_a"] = {"$in": [current_user.role]}
+    
+    circulares = await db.circulares.find(filter_query).sort("fecha_publicacion", -1).to_list(100)
+    return [Circular(**circular) for circular in circulares]
+
+# Dashboard endpoints mejorados
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
-    if current_user.role == UserRole.ADMIN_COLEGIO:
-        # Estadísticas para administrador
-        total_pagos = await db.pagos.count_documents({})
+    if current_user.role == UserRole.ADMIN_GLOBAL:
+        # Estadísticas globales
+        return await get_global_stats(current_user)
+    
+    elif current_user.role == UserRole.ADMIN_COLEGIO:
         inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
         inscripcion_ids = [i["id"] for i in inscripciones]
         
@@ -761,7 +1046,6 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
             "estado": PaymentStatus.PENDIENTE
         })
         
-        # Calcular ingresos totales
         pagos_completados_docs = await db.pagos.find({
             "inscripcion_id": {"$in": inscripcion_ids},
             "estado": PaymentStatus.COMPLETADO
@@ -780,6 +1064,7 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
             "pagos_pendientes": pagos_pendientes,
             "ingresos_totales": f"${ingresos_totales:,.2f}"
         }
+    
     elif current_user.role == UserRole.PADRE:
         mis_estudiantes = await db.estudiantes.find({"padre_id": current_user.id}).to_list(1000)
         mis_inscripciones = await db.inscripciones.find({"padre_id": current_user.id}).to_list(1000)
@@ -806,27 +1091,21 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
 # Reports endpoints
 @api_router.get("/reportes/pagos")
 async def get_payment_reports(current_user: User = Depends(get_current_user)):
-    """Reporte de pagos para administradores"""
     if current_user.role != UserRole.ADMIN_COLEGIO:
         raise HTTPException(status_code=403, detail="Only administrators can access reports")
     
-    # Obtener inscripciones del colegio
     inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
     inscripcion_ids = [i["id"] for i in inscripciones]
     
-    # Obtener pagos
     pagos = await db.pagos.find({"inscripcion_id": {"$in": inscripcion_ids}}).to_list(1000)
     
-    # Obtener actividades y estudiantes para enriquecer los datos
     actividades = await db.actividades.find({"colegio_id": current_user.colegio_id}).to_list(1000)
     estudiantes = await db.estudiantes.find({"colegio_id": current_user.colegio_id}).to_list(1000)
     
-    # Crear mapas para búsqueda rápida
     actividades_map = {a["id"]: a for a in actividades}
     estudiantes_map = {e["id"]: e for e in estudiantes}
     inscripciones_map = {i["id"]: i for i in inscripciones}
     
-    # Enriquecer datos de pagos
     pagos_enriquecidos = []
     for pago in pagos:
         inscripcion = inscripciones_map.get(pago["inscripcion_id"])
@@ -842,7 +1121,6 @@ async def get_payment_reports(current_user: User = Depends(get_current_user)):
             }
             pagos_enriquecidos.append(pago_info)
     
-    # Estadísticas resumidas
     total_ingresos = sum(p.get("monto", 0) for p in pagos if p["estado"] == PaymentStatus.COMPLETADO)
     ingresos_pendientes = sum(p.get("monto", 0) for p in pagos if p["estado"] == PaymentStatus.PENDIENTE)
     
@@ -860,7 +1138,7 @@ async def get_payment_reports(current_user: User = Depends(get_current_user)):
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo v1.0"}
+    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.1"}
 
 # Include router
 app.include_router(api_router)
