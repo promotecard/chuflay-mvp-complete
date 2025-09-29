@@ -481,11 +481,20 @@ async def update_colegio_global(colegio_id: str, update_data: ColegioUpdate, cur
     update_dict["updated_at"] = datetime.utcnow()
     
     result = await db.colegios.update_one({"id": colegio_id}, {"$set": update_dict})
+    logger.info(f"Update result for college {colegio_id}: matched={result.matched_count}, modified={result.modified_count}")
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="College not found")
     
     updated_colegio = await db.colegios.find_one({"id": colegio_id})
+    logger.info(f"Find after update for college {colegio_id}: found={updated_colegio is not None}")
     if not updated_colegio:
+        # Let's check if it exists with a different query
+        all_colleges = await db.colegios.find().to_list(100)
+        logger.info(f"Total colleges in DB: {len(all_colleges)}")
+        for c in all_colleges:
+            if c.get('id') == colegio_id:
+                logger.info(f"Found college by iteration: {c.get('nombre')}")
+                break
         raise HTTPException(status_code=404, detail="College not found after update")
     return Colegio(**updated_colegio)
 
