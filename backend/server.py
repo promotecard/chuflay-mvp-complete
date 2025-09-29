@@ -491,10 +491,15 @@ async def update_colegio_global(colegio_id: str, update_data: ColegioUpdate, cur
         # Let's check if it exists with a different query
         all_colleges = await db.colegios.find().to_list(100)
         logger.info(f"Total colleges in DB: {len(all_colleges)}")
+        found_by_iteration = None
         for c in all_colleges:
             if c.get('id') == colegio_id:
                 logger.info(f"Found college by iteration: {c.get('nombre')}")
+                found_by_iteration = c
                 break
+        if found_by_iteration:
+            logger.info("Using college found by iteration")
+            return Colegio(**found_by_iteration)
         raise HTTPException(status_code=404, detail="College not found after update")
     return Colegio(**updated_colegio)
 
