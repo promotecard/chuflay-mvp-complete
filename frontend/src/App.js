@@ -1173,6 +1173,760 @@ const ModalPago = ({ inscripcion, actividad, estudiante, onClose, onSuccess }) =
   );
 };
 
+// Componente para gestión de colegios (Global Admin)
+const GlobalColegios = () => {
+  const [colegios, setColegios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingColegio, setEditingColegio] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    direccion: '',
+    telefono: '',
+    email: '',
+    director: '',
+    nivel_educativo: ''
+  });
+
+  useEffect(() => {
+    fetchColegios();
+  }, []);
+
+  const fetchColegios = async () => {
+    try {
+      const response = await axios.get(`${API}/global/colegios`);
+      setColegios(response.data);
+    } catch (error) {
+      console.error('Error fetching colegios:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingColegio) {
+        await axios.put(`${API}/global/colegios/${editingColegio.id}`, formData);
+      } else {
+        await axios.post(`${API}/global/colegios`, formData);
+      }
+      setShowModal(false);
+      setEditingColegio(null);
+      setFormData({
+        nombre: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        director: '',
+        nivel_educativo: ''
+      });
+      fetchColegios();
+    } catch (error) {
+      console.error('Error saving colegio:', error);
+    }
+  };
+
+  const handleEdit = (colegio) => {
+    setEditingColegio(colegio);
+    setFormData({
+      nombre: colegio.nombre,
+      direccion: colegio.direccion,
+      telefono: colegio.telefono,
+      email: colegio.email,
+      director: colegio.director,
+      nivel_educativo: colegio.nivel_educativo
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (colegioId) => {
+    if (window.confirm('¿Está seguro de eliminar este colegio?')) {
+      try {
+        await axios.delete(`${API}/global/colegios/${colegioId}`);
+        fetchColegios();
+      } catch (error) {
+        console.error('Error deleting colegio:', error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Colegios">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Colegios">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Administra todos los colegios de la plataforma</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          + Nuevo Colegio
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Colegio
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Director
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contacto
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Nivel
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {colegios.map((colegio) => (
+              <tr key={colegio.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{colegio.nombre}</div>
+                    <div className="text-sm text-gray-500">{colegio.direccion}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {colegio.director}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{colegio.email}</div>
+                  <div className="text-sm text-gray-500">{colegio.telefono}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {colegio.nivel_educativo}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
+                    onClick={() => handleEdit(colegio)}
+                    className="text-blue-600 hover:text-blue-900 mr-3"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(colegio.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal para crear/editar colegio */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingColegio ? 'Editar Colegio' : 'Nuevo Colegio'}
+              </h3>
+              <form onSubmit={handleSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Colegio
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dirección
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.direccion}
+                    onChange={(e) => setFormData({...formData, direccion: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.telefono}
+                    onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Director
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.director}
+                    onChange={(e) => setFormData({...formData, director: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nivel Educativo
+                  </label>
+                  <select
+                    required
+                    value={formData.nivel_educativo}
+                    onChange={(e) => setFormData({...formData, nivel_educativo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar nivel</option>
+                    <option value="Inicial">Inicial</option>
+                    <option value="Primaria">Primaria</option>
+                    <option value="Secundaria">Secundaria</option>
+                    <option value="Mixto">Mixto</option>
+                  </select>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingColegio(null);
+                      setFormData({
+                        nombre: '',
+                        direccion: '',
+                        telefono: '',
+                        email: '',
+                        director: '',
+                        nivel_educativo: ''
+                      });
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {editingColegio ? 'Actualizar' : 'Crear'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Componente para gestión de usuarios globales
+const GlobalUsuarios = () => {
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [impersonateLoading, setImpersonateLoading] = useState({});
+
+  useEffect(() => {
+    fetchUsuarios();
+  }, []);
+
+  const fetchUsuarios = async () => {
+    try {
+      const response = await axios.get(`${API}/global/usuarios`);
+      setUsuarios(response.data);
+    } catch (error) {
+      console.error('Error fetching usuarios:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImpersonate = async (userId) => {
+    setImpersonateLoading(prev => ({ ...prev, [userId]: true }));
+    try {
+      const response = await axios.post(`${API}/global/impersonate`, { user_id: userId });
+      const { access_token, user: userData } = response.data;
+      
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      
+      // Reload to apply new user context
+      window.location.reload();
+    } catch (error) {
+      console.error('Error impersonating user:', error);
+      alert('Error al impersonar usuario');
+    } finally {
+      setImpersonateLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const getRoleDisplayName = (role) => {
+    const roleNames = {
+      admin_global: 'Admin Global',
+      admin_colegio: 'Admin Colegio',
+      padre: 'Padre',
+      estudiante: 'Estudiante',
+      profesor: 'Profesor',
+      proveedor: 'Proveedor'
+    };
+    return roleNames[role] || role;
+  };
+
+  const getRoleBadgeColor = (role) => {
+    const colors = {
+      admin_global: 'bg-purple-100 text-purple-800',
+      admin_colegio: 'bg-blue-100 text-blue-800',
+      padre: 'bg-green-100 text-green-800',
+      estudiante: 'bg-yellow-100 text-yellow-800',
+      profesor: 'bg-indigo-100 text-indigo-800',
+      proveedor: 'bg-gray-100 text-gray-800'
+    };
+    return colors[role] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Usuarios">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Usuarios">
+      <div className="mb-6">
+        <p className="text-gray-600">Administra usuarios de todos los colegios</p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Usuario
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rol
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Colegio
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {usuarios.map((usuario) => (
+              <tr key={usuario.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{usuario.nombre_completo}</div>
+                    <div className="text-sm text-gray-500">{usuario.email}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(usuario.role)}`}>
+                    {getRoleDisplayName(usuario.role)}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {usuario.colegio_nombre || 'N/A'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                    Activo
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {usuario.role !== 'admin_global' && (
+                    <button
+                      onClick={() => handleImpersonate(usuario.id)}
+                      disabled={impersonateLoading[usuario.id]}
+                      className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
+                    >
+                      {impersonateLoading[usuario.id] ? 'Cargando...' : 'Impersonar'}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Layout>
+  );
+};
+
+// Componente para reportes globales
+const GlobalReportes = () => {
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchGlobalStats();
+  }, []);
+
+  const fetchGlobalStats = async () => {
+    try {
+      const response = await axios.get(`${API}/global/estadisticas`);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching global stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Reportes Globales">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Reportes Globales">
+      <div className="mb-6">
+        <p className="text-gray-600">Analytics y métricas de toda la plataforma</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">🏫</span>
+              </div>
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{stats.total_colegios || 0}</div>
+              <div className="text-sm text-gray-600">Colegios Registrados</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">👥</span>
+              </div>
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{stats.total_usuarios || 0}</div>
+              <div className="text-sm text-gray-600">Usuarios Totales</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">🎯</span>
+              </div>
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{stats.total_actividades || 0}</div>
+              <div className="text-sm text-gray-600">Actividades Creadas</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">📋</span>
+              </div>
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{stats.total_inscripciones || 0}</div>
+              <div className="text-sm text-gray-600">Inscripciones</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Distribución por Roles</h3>
+          <div className="space-y-3">
+            {stats.usuarios_por_rol && Object.entries(stats.usuarios_por_rol).map(([role, count]) => (
+              <div key={role} className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 capitalize">{role.replace(/_/g, ' ')}</span>
+                <span className="text-sm font-semibold text-gray-900">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ingresos Totales</h3>
+          <div className="text-3xl font-bold text-green-600 mb-2">
+            ${stats.ingresos_totales || 0}
+          </div>
+          <div className="text-sm text-gray-600">
+            Ingresos Pendientes: ${stats.ingresos_pendientes || 0}
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+// Componente para gestión de suscripciones
+const GlobalSuscripciones = () => {
+  const [suscripciones, setSuscripciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    colegio_id: '',
+    plan: 'basico',
+    precio: 0,
+    vigencia_hasta: ''
+  });
+
+  useEffect(() => {
+    fetchSuscripciones();
+  }, []);
+
+  const fetchSuscripciones = async () => {
+    try {
+      const response = await axios.get(`${API}/global/suscripciones`);
+      setSuscripciones(response.data);
+    } catch (error) {
+      console.error('Error fetching suscripciones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/global/suscripciones`, formData);
+      setShowModal(false);
+      setFormData({
+        colegio_id: '',
+        plan: 'basico',
+        precio: 0,
+        vigencia_hasta: ''
+      });
+      fetchSuscripciones();
+    } catch (error) {
+      console.error('Error creating suscripcion:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Suscripciones">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Suscripciones">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Gestiona planes y facturación de colegios</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          + Nueva Suscripción
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Colegio
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Plan
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Precio
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Vigencia
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {suscripciones.map((suscripcion) => (
+              <tr key={suscripcion.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {suscripcion.colegio_nombre}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
+                    {suscripcion.plan}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  ${suscripcion.precio}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    suscripcion.estado === 'activa' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {suscripcion.estado}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {new Date(suscripcion.vigencia_hasta).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal para crear suscripción */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Nueva Suscripción</h3>
+              <form onSubmit={handleSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ID del Colegio
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.colegio_id}
+                    onChange={(e) => setFormData({...formData, colegio_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Plan
+                  </label>
+                  <select
+                    value={formData.plan}
+                    onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="basico">Básico</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Precio
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.precio}
+                    onChange={(e) => setFormData({...formData, precio: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vigencia Hasta
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.vigencia_hasta}
+                    onChange={(e) => setFormData({...formData, vigencia_hasta: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setFormData({
+                        colegio_id: '',
+                        plan: 'basico',
+                        precio: 0,
+                        vigencia_hasta: ''
+                      });
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Crear
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
