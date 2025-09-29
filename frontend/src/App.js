@@ -1927,6 +1927,525 @@ const GlobalSuscripciones = () => {
   );
 };
 
+// Componente para gestión de actividades (Admin Colegio)
+const AdminActividades = () => {
+  const [actividades, setActividades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingActividad, setEditingActividad] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    descripcion: '',
+    fecha: '',
+    horario_inicio: '',
+    horario_fin: '',
+    ubicacion: '',
+    capacidad_maxima: '',
+    costo: '',
+    categoria: '',
+    responsable: '',
+    imagen_url: '',
+    campos_personalizados: {}
+  });
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [customFields, setCustomFields] = useState([]);
+
+  useEffect(() => {
+    fetchActividades();
+  }, []);
+
+  const fetchActividades = async () => {
+    try {
+      const response = await axios.get(`${API}/actividades`);
+      setActividades(response.data);
+    } catch (error) {
+      console.error('Error fetching actividades:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (file) => {
+    if (!file) return null;
+    
+    setUploadLoading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      
+      const response = await axios.post(`${API}/upload/imagen`, formDataUpload, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      return response.data.url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Error al subir la imagen');
+      return null;
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    let imageUrl = formData.imagen_url;
+    
+    // Upload image if selected
+    if (selectedImage) {
+      imageUrl = await handleImageUpload(selectedImage);
+      if (!imageUrl) return; // Exit if upload failed
+    }
+
+    // Prepare custom fields
+    const customFieldsData = {};
+    customFields.forEach(field => {
+      if (field.name && field.value) {
+        customFieldsData[field.name] = field.value;
+      }
+    });
+
+    const dataToSend = {
+      ...formData,
+      imagen_url: imageUrl,
+      capacidad_maxima: parseInt(formData.capacidad_maxima),
+      costo: parseFloat(formData.costo),
+      campos_personalizados: customFieldsData
+    };
+
+    try {
+      if (editingActividad) {
+        await axios.put(`${API}/actividades/${editingActividad.id}`, dataToSend);
+      } else {
+        await axios.post(`${API}/actividades`, dataToSend);
+      }
+      
+      setShowModal(false);
+      setEditingActividad(null);
+      resetForm();
+      fetchActividades();
+    } catch (error) {
+      console.error('Error saving actividad:', error);
+      alert('Error al guardar la actividad');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      nombre: '',
+      descripcion: '',
+      fecha: '',
+      horario_inicio: '',
+      horario_fin: '',
+      ubicacion: '',
+      capacidad_maxima: '',
+      costo: '',
+      categoria: '',
+      responsable: '',
+      imagen_url: '',
+      campos_personalizados: {}
+    });
+    setSelectedImage(null);
+    setCustomFields([]);
+  };
+
+  const handleEdit = (actividad) => {
+    setEditingActividad(actividad);
+    setFormData({
+      nombre: actividad.nombre,
+      descripcion: actividad.descripcion,
+      fecha: actividad.fecha,
+      horario_inicio: actividad.horario_inicio,
+      horario_fin: actividad.horario_fin,
+      ubicacion: actividad.ubicacion,
+      capacidad_maxima: actividad.capacidad_maxima.toString(),
+      costo: actividad.costo.toString(),
+      categoria: actividad.categoria,
+      responsable: actividad.responsable,
+      imagen_url: actividad.imagen_url || '',
+      campos_personalizados: actividad.campos_personalizados || {}
+    });
+    
+    // Load custom fields
+    const loadedFields = Object.entries(actividad.campos_personalizados || {}).map(([name, value]) => ({
+      name,
+      value
+    }));
+    setCustomFields(loadedFields);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (actividadId) => {
+    if (window.confirm('¿Está seguro de eliminar esta actividad?')) {
+      try {
+        await axios.delete(`${API}/actividades/${actividadId}`);
+        fetchActividades();
+      } catch (error) {
+        console.error('Error deleting actividad:', error);
+      }
+    }
+  };
+
+  const addCustomField = () => {
+    setCustomFields([...customFields, { name: '', value: '' }]);
+  };
+
+  const removeCustomField = (index) => {
+    setCustomFields(customFields.filter((_, i) => i !== index));
+  };
+
+  const updateCustomField = (index, field, value) => {
+    const updated = [...customFields];
+    updated[index][field] = value;
+    setCustomFields(updated);
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Actividades">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Actividades">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Crea y administra las actividades del colegio</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          + Nueva Actividad
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actividad
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fecha
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Horario
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Capacidad
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Costo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {actividades.map((actividad) => (
+              <tr key={actividad.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    {actividad.imagen_url && (
+                      <img 
+                        src={actividad.imagen_url} 
+                        alt={actividad.nombre}
+                        className="h-10 w-10 rounded-full mr-3 object-cover"
+                      />
+                    )}
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{actividad.nombre}</div>
+                      <div className="text-sm text-gray-500">{actividad.categoria}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {new Date(actividad.fecha).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {actividad.horario_inicio} - {actividad.horario_fin}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {actividad.capacidad_maxima}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  ${actividad.costo}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
+                    onClick={() => handleEdit(actividad)}
+                    className="text-blue-600 hover:text-blue-900 mr-3"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(actividad.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal para crear/editar actividad */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingActividad ? 'Editar Actividad' : 'Nueva Actividad'}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de la Actividad
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descripción
+                  </label>
+                  <textarea
+                    rows="3"
+                    required
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.fecha}
+                    onChange={(e) => setFormData({...formData, fecha: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ubicación
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.ubicacion}
+                    onChange={(e) => setFormData({...formData, ubicacion: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hora de Inicio
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.horario_inicio}
+                    onChange={(e) => setFormData({...formData, horario_inicio: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hora de Fin
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.horario_fin}
+                    onChange={(e) => setFormData({...formData, horario_fin: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Capacidad Máxima
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.capacidad_maxima}
+                    onChange={(e) => setFormData({...formData, capacidad_maxima: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Costo
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.costo}
+                    onChange={(e) => setFormData({...formData, costo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Categoría
+                  </label>
+                  <select
+                    required
+                    value={formData.categoria}
+                    onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    <option value="Deportes">Deportes</option>
+                    <option value="Arte">Arte</option>
+                    <option value="Música">Música</option>
+                    <option value="Ciencia">Ciencia</option>
+                    <option value="Tecnología">Tecnología</option>
+                    <option value="Idiomas">Idiomas</option>
+                    <option value="Académico">Académico</option>
+                    <option value="Cultural">Cultural</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Responsable
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.responsable}
+                    onChange={(e) => setFormData({...formData, responsable: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Image Upload Section */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Imagen de la Actividad
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedImage(e.target.files[0])}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    {uploadLoading && (
+                      <div className="text-sm text-blue-600">Subiendo...</div>
+                    )}
+                  </div>
+                  {(formData.imagen_url || selectedImage) && (
+                    <div className="mt-2">
+                      <img 
+                        src={selectedImage ? URL.createObjectURL(selectedImage) : formData.imagen_url} 
+                        alt="Preview"
+                        className="h-20 w-20 object-cover rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Fields Section */}
+                <div className="md:col-span-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Campos Personalizados
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addCustomField}
+                      className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200"
+                    >
+                      + Agregar Campo
+                    </button>
+                  </div>
+                  {customFields.map((field, index) => (
+                    <div key={index} className="flex space-x-2 mb-2">
+                      <input
+                        type="text"
+                        placeholder="Nombre del campo"
+                        value={field.name}
+                        onChange={(e) => updateCustomField(index, 'name', e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Valor"
+                        value={field.value}
+                        onChange={(e) => updateCustomField(index, 'value', e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCustomField(index)}
+                        className="px-3 py-2 bg-red-100 text-red-800 rounded hover:bg-red-200"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="md:col-span-2 flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingActividad(null);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploadLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {uploadLoading ? 'Subiendo...' : (editingActividad ? 'Actualizar' : 'Crear')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
