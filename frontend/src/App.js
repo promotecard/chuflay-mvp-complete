@@ -2446,6 +2446,564 @@ const AdminActividades = () => {
   );
 };
 
+// Componente para gestión de comunicación (Admin Colegio)
+const AdminComunicacion = () => {
+  const [mensajes, setMensajes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [stats, setStats] = useState({});
+  const [formData, setFormData] = useState({
+    titulo: '',
+    contenido: '',
+    tipo: 'comunicado',
+    prioridad: 'media',
+    dirigida_a: [],
+    usuarios_especificos: [],
+    cursos_objetivo: [],
+    requiere_confirmacion: false,
+    fecha_programada: null
+  });
+
+  useEffect(() => {
+    fetchMensajes();
+    fetchStats();
+  }, []);
+
+  const fetchMensajes = async () => {
+    try {
+      const response = await axios.get(`${API}/comunicacion/mensajes`);
+      setMensajes(response.data);
+    } catch (error) {
+      console.error('Error fetching mensajes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/comunicacion/estadisticas`);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const dataToSend = {
+        ...formData,
+        dirigida_a: formData.dirigida_a.filter(Boolean),
+        cursos_objetivo: formData.cursos_objetivo.filter(Boolean)
+      };
+
+      if (editingMessage) {
+        await axios.put(`${API}/comunicacion/mensajes/${editingMessage.id}`, dataToSend);
+      } else {
+        await axios.post(`${API}/comunicacion/mensajes`, dataToSend);
+      }
+      
+      setShowModal(false);
+      setEditingMessage(null);
+      resetForm();
+      fetchMensajes();
+      fetchStats();
+    } catch (error) {
+      console.error('Error saving message:', error);
+      alert('Error al guardar el mensaje');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      titulo: '',
+      contenido: '',
+      tipo: 'comunicado',
+      prioridad: 'media',
+      dirigida_a: [],
+      usuarios_especificos: [],
+      cursos_objetivo: [],
+      requiere_confirmacion: false,
+      fecha_programada: null
+    });
+  };
+
+  const handleEdit = (mensaje) => {
+    setEditingMessage(mensaje);
+    setFormData({
+      titulo: mensaje.titulo,
+      contenido: mensaje.contenido,
+      tipo: mensaje.tipo,
+      prioridad: mensaje.prioridad,
+      dirigida_a: mensaje.dirigida_a || [],
+      usuarios_especificos: mensaje.usuarios_especificos || [],
+      cursos_objetivo: mensaje.cursos_objetivo || [],
+      requiere_confirmacion: mensaje.requiere_confirmacion || false,
+      fecha_programada: mensaje.fecha_programada || null
+    });
+    setShowModal(true);
+  };
+
+  const handleSend = async (mensajeId) => {
+    if (window.confirm('¿Está seguro de enviar este mensaje?')) {
+      try {
+        await axios.post(`${API}/comunicacion/mensajes/${mensajeId}/enviar`);
+        fetchMensajes();
+        fetchStats();
+        alert('Mensaje enviado exitosamente');
+      } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Error al enviar el mensaje');
+      }
+    }
+  };
+
+  const handleDelete = async (mensajeId) => {
+    if (window.confirm('¿Está seguro de eliminar este mensaje?')) {
+      try {
+        await axios.delete(`${API}/comunicacion/mensajes/${mensajeId}`);
+        fetchMensajes();
+        fetchStats();
+      } catch (error) {
+        console.error('Error deleting message:', error);
+      }
+    }
+  };
+
+  const getStatusBadge = (estado) => {
+    const colors = {
+      borrador: 'bg-gray-100 text-gray-800',
+      enviado: 'bg-green-100 text-green-800',
+      programado: 'bg-blue-100 text-blue-800',
+      archivado: 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getPriorityBadge = (prioridad) => {
+    const colors = {
+      baja: 'bg-gray-100 text-gray-800',
+      media: 'bg-blue-100 text-blue-800',
+      alta: 'bg-orange-100 text-orange-800',
+      urgente: 'bg-red-100 text-red-800'
+    };
+    return colors[prioridad] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getTypeBadge = (tipo) => {
+    const colors = {
+      circular: 'bg-purple-100 text-purple-800',
+      comunicado: 'bg-blue-100 text-blue-800',
+      anuncio: 'bg-green-100 text-green-800',
+      notificacion: 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[tipo] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Sistema de Comunicación">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Sistema de Comunicación">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-blue-600">{stats.total_mensajes || 0}</div>
+          <div className="text-gray-600 text-sm">Total Mensajes</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-green-600">{stats.mensajes_enviados || 0}</div>
+          <div className="text-gray-600 text-sm">Mensajes Enviados</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-yellow-600">{stats.mensajes_borradores || 0}</div>
+          <div className="text-gray-600 text-sm">Borradores</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-purple-600">{stats.tasa_lectura_promedio || 0}%</div>
+          <div className="text-gray-600 text-sm">Tasa de Lectura</div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Gestiona circulares, comunicados y anuncios</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          + Nuevo Mensaje
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Mensaje
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Prioridad
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Destinatarios
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {mensajes.map((mensaje) => (
+              <tr key={mensaje.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{mensaje.titulo}</div>
+                    <div className="text-sm text-gray-500">{new Date(mensaje.created_at).toLocaleDateString()}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeBadge(mensaje.tipo)}`}>
+                    {mensaje.tipo}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(mensaje.estado)}`}>
+                    {mensaje.estado}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityBadge(mensaje.prioridad)}`}>
+                    {mensaje.prioridad}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {mensaje.total_destinatarios || 0} / {mensaje.total_leidos || 0} leídos
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {mensaje.estado === 'borrador' && (
+                    <>
+                      <button
+                        onClick={() => handleEdit(mensaje)}
+                        className="text-blue-600 hover:text-blue-900 mr-3"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleSend(mensaje.id)}
+                        className="text-green-600 hover:text-green-900 mr-3"
+                      >
+                        Enviar
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => handleDelete(mensaje.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal para crear/editar mensaje */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingMessage ? 'Editar Mensaje' : 'Nuevo Mensaje'}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Título del Mensaje
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contenido
+                  </label>
+                  <textarea
+                    rows="5"
+                    required
+                    value={formData.contenido}
+                    onChange={(e) => setFormData({...formData, contenido: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Mensaje
+                  </label>
+                  <select
+                    required
+                    value={formData.tipo}
+                    onChange={(e) => setFormData({...formData, tipo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="comunicado">Comunicado</option>
+                    <option value="circular">Circular</option>
+                    <option value="anuncio">Anuncio</option>
+                    <option value="notificacion">Notificación</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Prioridad
+                  </label>
+                  <select
+                    value={formData.prioridad}
+                    onChange={(e) => setFormData({...formData, prioridad: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dirigido a (Roles)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['padre', 'estudiante', 'profesor', 'admin_colegio'].map(role => (
+                      <label key={role} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.dirigida_a.includes(role)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({...formData, dirigida_a: [...formData.dirigida_a, role]});
+                            } else {
+                              setFormData({...formData, dirigida_a: formData.dirigida_a.filter(r => r !== role)});
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <span className="capitalize">{role.replace('_', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.requiere_confirmacion}
+                      onChange={(e) => setFormData({...formData, requiere_confirmacion: e.target.checked})}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Requiere confirmación de lectura</span>
+                  </label>
+                </div>
+
+                <div className="md:col-span-2 flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingMessage(null);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {editingMessage ? 'Actualizar' : 'Crear Borrador'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Componente para ver comunicados (Padres y otros usuarios)
+const Comunicados = () => {
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotificaciones();
+  }, []);
+
+  const fetchNotificaciones = async () => {
+    try {
+      const response = await axios.get(`${API}/comunicacion/notificaciones`);
+      setNotificaciones(response.data);
+    } catch (error) {
+      console.error('Error fetching notificaciones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (notificacionId, requiresConfirmation = false) => {
+    try {
+      await axios.put(`${API}/comunicacion/notificaciones/${notificacionId}/leer`, {
+        confirmacion: requiresConfirmation
+      });
+      fetchNotificaciones();
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
+  };
+
+  const getPriorityColor = (prioridad) => {
+    const colors = {
+      baja: 'border-gray-200',
+      media: 'border-blue-200',
+      alta: 'border-orange-200',
+      urgente: 'border-red-200'
+    };
+    return colors[prioridad] || 'border-gray-200';
+  };
+
+  const getPriorityIcon = (prioridad) => {
+    const icons = {
+      baja: '📝',
+      media: '📋',
+      alta: '⚠️',
+      urgente: '🚨'
+    };
+    return icons[prioridad] || '📝';
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Comunicados">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Comunicados">
+      <div className="mb-6">
+        <p className="text-gray-600">Comunicados y mensajes del colegio</p>
+      </div>
+
+      <div className="space-y-6">
+        {notificaciones.map((notif) => (
+          <div
+            key={notif.id}
+            className={`bg-white rounded-lg shadow border-l-4 ${getPriorityColor(notif.mensaje_prioridad)} ${
+              notif.estado === 'no_leida' ? 'border-l-blue-500' : ''
+            }`}
+          >
+            <div className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3">
+                  <div className="text-2xl">{getPriorityIcon(notif.mensaje_prioridad)}</div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{notif.mensaje_titulo}</h3>
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
+                        {notif.mensaje_tipo}
+                      </span>
+                      {notif.estado === 'no_leida' && (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          Nuevo
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500 mb-2">
+                      {new Date(notif.created_at).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {notif.estado === 'no_leida' && (
+                <div className="mt-4 flex space-x-3">
+                  <button
+                    onClick={() => markAsRead(notif.id, false)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                  >
+                    Marcar como Leído
+                  </button>
+                  {notif.requiere_confirmacion && (
+                    <button
+                      onClick={() => markAsRead(notif.id, true)}
+                      className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+                    >
+                      Confirmar Lectura
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {notif.estado === 'leida' && (
+                <div className="mt-4 text-sm text-gray-500">
+                  ✓ Leído el {new Date(notif.fecha_leido).toLocaleDateString()}
+                  {notif.confirmado && ' • Confirmado'}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {notificaciones.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">📭</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No hay comunicados</h2>
+            <p className="text-gray-600">No tienes comunicados pendientes por leer</p>
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
