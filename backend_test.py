@@ -828,6 +828,21 @@ class ChuflayBackendTester:
         self.test_global_admin_statistics()
         self.test_global_admin_subscriptions()
         
+        # Setup admin colegio with college assignment
+        self.setup_admin_colegio_with_college()
+        
+        # Test Communication System
+        print("\n💬 Testing Communication System...")
+        self.test_communication_system_get_messages()
+        self.test_communication_system_create_message()
+        self.test_communication_system_update_message()
+        self.test_communication_system_send_message()
+        self.test_communication_system_get_notifications()
+        self.test_communication_system_mark_notification_read()
+        self.test_communication_system_delete_message()
+        self.test_communication_system_statistics()
+        self.test_communication_system_authorization()
+        
         # Test Image Upload System
         print("\n📸 Testing Image Upload System...")
         self.test_image_upload_system()
