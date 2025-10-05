@@ -508,7 +508,7 @@ class ChuflayBackendTester:
         headers = {"Authorization": f"Bearer {self.admin_colegio_token}"}
         
         try:
-            # Test: Create Circular
+            # Test: Create Circular (for updating)
             circular_data = {
                 "titulo": "Circular Informativa de Prueba",
                 "contenido": "Esta es una circular de prueba para el sistema de comunicación. Contiene información importante para padres y estudiantes sobre las próximas actividades escolares.",
@@ -528,7 +528,7 @@ class ChuflayBackendTester:
                 self.log_test("Communication - Create Circular", False, f"Status: {response.status_code}, Response: {response.text}")
                 return False
             
-            # Test: Create Comunicado
+            # Test: Create Comunicado (for sending)
             comunicado_data = {
                 "titulo": "Comunicado Urgente",
                 "contenido": "Comunicado urgente sobre cambios en el horario escolar debido a condiciones climáticas.",
@@ -547,7 +547,7 @@ class ChuflayBackendTester:
                 self.log_test("Communication - Create Comunicado", False, f"Status: {response.status_code}")
                 return False
             
-            # Test: Create Anuncio
+            # Test: Create Anuncio (for deleting)
             anuncio_data = {
                 "titulo": "Anuncio: Festival Escolar",
                 "contenido": "Se anuncia la celebración del festival escolar anual. Todos los estudiantes y padres están invitados a participar.",
