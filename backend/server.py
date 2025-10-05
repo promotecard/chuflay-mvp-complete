@@ -1490,7 +1490,7 @@ async def get_communication_stats(current_user: User = Depends(get_current_user)
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.1"}
+    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.2 + Sistema de Comunicación"}
 
 # Include router
 app.include_router(api_router)
