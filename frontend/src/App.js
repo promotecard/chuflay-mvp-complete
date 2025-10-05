@@ -3112,7 +3112,7 @@ const App = () => {
             path="/admin/comunicacion" 
             element={
               <ProtectedRoute allowedRoles={['admin_colegio']}>
-                <ComingSoon title="Comunicación" />
+                <AdminComunicacion />
               </ProtectedRoute>
             } 
           />
