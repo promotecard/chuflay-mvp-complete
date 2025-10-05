@@ -697,6 +697,468 @@ const Dashboard = () => {
   );
 };
 
+// Componente para ver actividades (Padres)
+const ActividadesPage = () => {
+  const [actividades, setActividades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedActividad, setSelectedActividad] = useState(null);
+
+  useEffect(() => {
+    fetchActividades();
+  }, []);
+
+  const fetchActividades = async () => {
+    try {
+      const response = await axios.get(`${API}/actividades/publicas`);
+      setActividades(response.data);
+    } catch (error) {
+      console.error('Error fetching actividades:', error);
+      // Fallback to regular actividades endpoint
+      try {
+        const fallbackResponse = await axios.get(`${API}/actividades`);
+        setActividades(fallbackResponse.data);
+      } catch (fallbackError) {
+        console.error('Error fetching actividades fallback:', fallbackError);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInscripcion = async (actividadId) => {
+    try {
+      // Aquí iría la lógica de inscripción
+      alert('Funcionalidad de inscripción próximamente');
+    } catch (error) {
+      console.error('Error en inscripción:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Actividades del Colegio">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Actividades del Colegio">
+      <div className="mb-6">
+        <p className="text-gray-600">Descubre e inscríbete en las actividades disponibles</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {actividades.map((actividad) => (
+          <div key={actividad.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6">
+            {actividad.imagen_url && (
+              <img 
+                src={actividad.imagen_url} 
+                alt={actividad.nombre}
+                className="w-full h-48 object-cover rounded-lg mb-4"
+              />
+            )}
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{actividad.nombre}</h3>
+            <p className="text-gray-600 text-sm mb-4">{actividad.descripcion}</p>
+            
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center text-sm text-gray-500">
+                <span className="font-medium mr-2">📅 Fecha:</span>
+                {new Date(actividad.fecha).toLocaleDateString()}
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <span className="font-medium mr-2">⏰ Horario:</span>
+                {actividad.horario_inicio} - {actividad.horario_fin}
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <span className="font-medium mr-2">📍 Lugar:</span>
+                {actividad.ubicacion}
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <span className="font-medium mr-2">💰 Costo:</span>
+                ${actividad.costo}
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <span className="font-medium mr-2">👥 Capacidad:</span>
+                {actividad.capacidad_maxima} personas
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                {actividad.categoria}
+              </span>
+              <button
+                onClick={() => handleInscripcion(actividad.id)}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                Inscribirse
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {actividades.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎯</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No hay actividades disponibles</h2>
+          <p className="text-gray-600">Por el momento no hay actividades publicadas</p>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Componente para gestión de hijos (Padres)
+const MisHijosPage = () => {
+  const [hijos, setHijos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingHijo, setEditingHijo] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre_completo: '',
+    fecha_nacimiento: '',
+    curso_grado: '',
+    informacion_adicional: ''
+  });
+
+  useEffect(() => {
+    fetchHijos();
+  }, []);
+
+  const fetchHijos = async () => {
+    try {
+      const response = await axios.get(`${API}/estudiantes/mis-hijos`);
+      setHijos(response.data);
+    } catch (error) {
+      console.error('Error fetching hijos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      if (editingHijo) {
+        await axios.put(`${API}/estudiantes/${editingHijo.id}`, formData);
+      } else {
+        await axios.post(`${API}/estudiantes`, formData);
+      }
+      
+      setShowModal(false);
+      setEditingHijo(null);
+      resetForm();
+      fetchHijos();
+    } catch (error) {
+      console.error('Error saving hijo:', error);
+      alert('Error al guardar la información');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      nombre_completo: '',
+      fecha_nacimiento: '',
+      curso_grado: '',
+      informacion_adicional: ''
+    });
+  };
+
+  const handleEdit = (hijo) => {
+    setEditingHijo(hijo);
+    setFormData({
+      nombre_completo: hijo.nombre_completo,
+      fecha_nacimiento: hijo.fecha_nacimiento,
+      curso_grado: hijo.curso_grado,
+      informacion_adicional: hijo.informacion_adicional || ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (hijoId) => {
+    if (window.confirm('¿Está seguro de eliminar este registro?')) {
+      try {
+        await axios.delete(`${API}/estudiantes/${hijoId}`);
+        fetchHijos();
+      } catch (error) {
+        console.error('Error deleting hijo:', error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Mis Hijos">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Mis Hijos">
+      <div className="mb-6 flex justify-between items-center">
+        <p className="text-gray-600">Gestiona la información de tus hijos</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          + Agregar Hijo
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {hijos.map((hijo) => (
+          <div key={hijo.id} className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{hijo.nombre_completo}</h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleEdit(hijo)}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => handleDelete(hijo.id)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="font-medium mr-2">📅 Nacimiento:</span>
+                {new Date(hijo.fecha_nacimiento).toLocaleDateString()}
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="font-medium mr-2">🎓 Curso:</span>
+                {hijo.curso_grado}
+              </div>
+              {hijo.informacion_adicional && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">ℹ️ Información adicional:</span>
+                  <p className="mt-1">{hijo.informacion_adicional}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {hijos.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">👶</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No tienes hijos registrados</h2>
+          <p className="text-gray-600">Agrega la información de tus hijos para poder inscribirlos en actividades</p>
+          <button
+            onClick={() => setShowModal(true)}
+            className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          >
+            Agregar Primer Hijo
+          </button>
+        </div>
+      )}
+
+      {/* Modal para agregar/editar hijo */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingHijo ? 'Editar Hijo' : 'Agregar Hijo'}
+              </h3>
+              <form onSubmit={handleSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nombre_completo}
+                    onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha de Nacimiento
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.fecha_nacimiento}
+                    onChange={(e) => setFormData({...formData, fecha_nacimiento: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Curso/Grado
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.curso_grado}
+                    onChange={(e) => setFormData({...formData, curso_grado: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: 5to Básico"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Información Adicional
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={formData.informacion_adicional}
+                    onChange={(e) => setFormData({...formData, informacion_adicional: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Alergias, necesidades especiales, etc."
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingHijo(null);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {editingHijo ? 'Actualizar' : 'Agregar'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Componente para ver inscripciones (Padres)
+const MisInscripcionesPage = () => {
+  const [inscripciones, setInscripciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchInscripciones();
+  }, []);
+
+  const fetchInscripciones = async () => {
+    try {
+      const response = await axios.get(`${API}/inscripciones/mis-inscripciones`);
+      setInscripciones(response.data);
+    } catch (error) {
+      console.error('Error fetching inscripciones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (estado) => {
+    const colors = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      confirmada: 'bg-green-100 text-green-800',
+      pago_pendiente: 'bg-orange-100 text-orange-800',
+      cancelada: 'bg-red-100 text-red-800'
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Mis Inscripciones">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Mis Inscripciones">
+      <div className="mb-6">
+        <p className="text-gray-600">Revisa el estado de las inscripciones de tus hijos</p>
+      </div>
+
+      <div className="space-y-6">
+        {inscripciones.map((inscripcion) => (
+          <div key={inscripcion.id} className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  {inscripcion.actividad_nombre || 'Actividad'}
+                </h3>
+                <p className="text-gray-600">
+                  Estudiante: {inscripcion.estudiante_nombre || 'N/A'}
+                </p>
+              </div>
+              <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusBadge(inscripcion.estado)}`}>
+                {inscripcion.estado}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <span className="text-sm font-medium text-gray-500">Fecha de Inscripción:</span>
+                <p className="text-sm text-gray-900">
+                  {new Date(inscripcion.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-500">Costo:</span>
+                <p className="text-sm text-gray-900">${inscripcion.costo || 0}</p>
+              </div>
+            </div>
+
+            {inscripcion.notas && (
+              <div className="border-t pt-4">
+                <span className="text-sm font-medium text-gray-500">Notas:</span>
+                <p className="text-sm text-gray-900 mt-1">{inscripcion.notas}</p>
+              </div>
+            )}
+
+            {inscripcion.estado === 'pago_pendiente' && (
+              <div className="border-t pt-4">
+                <button className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">
+                  Realizar Pago
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {inscripciones.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📋</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No tienes inscripciones</h2>
+          <p className="text-gray-600">Cuando inscribas a tus hijos en actividades, aparecerán aquí</p>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página "Mis Pagos" para Padres - COMPLETA
 const MisPagosPage = () => {
   const [pagos, setPagos] = useState([]);
