@@ -30,6 +30,12 @@ class ChuflayBackendTester:
         self.test_colegio_id = None
         self.test_results = []
         
+        # Communication system test IDs
+        self.test_message_id = None
+        self.test_comunicado_id = None
+        self.test_anuncio_id = None
+        self.test_notification_id = None
+        
     def log_test(self, test_name: str, success: bool, details: str = ""):
         """Log test results"""
         status = "✅ PASS" if success else "❌ FAIL"
