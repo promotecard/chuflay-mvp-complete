@@ -339,7 +339,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Communication System Backend"
     - "Communication System Frontend"
   stuck_tasks: []
   test_all: false
