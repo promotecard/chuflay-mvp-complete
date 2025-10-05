@@ -1514,10 +1514,64 @@ async def get_communication_stats(current_user: User = Depends(get_current_user)
         mensajes_por_tipo=mensajes_por_tipo
     )
 
+# Additional APIs for Parent Interface
+
+@api_router.get("/actividades/publicas")
+async def get_public_activities():
+    """Obtener actividades públicas para padres"""
+    actividades = await db.actividades.find({"visibilidad": {"$ne": "privada"}}).to_list(1000)
+    return [Activity(**actividad) for actividad in actividades if actividad]
+
+@api_router.get("/estudiantes/mis-hijos")
+async def get_mis_hijos(current_user: User = Depends(get_current_user)):
+    """Obtener hijos del padre actual"""
+    if current_user.role != UserRole.PADRE:
+        raise HTTPException(status_code=403, detail="Only parents can access this endpoint")
+    
+    estudiantes = await db.estudiantes.find({"padre_id": current_user.id}).to_list(1000)
+    return [Estudiante(**estudiante) for estudiante in estudiantes]
+
+@api_router.get("/inscripciones/mis-inscripciones")
+async def get_mis_inscripciones(current_user: User = Depends(get_current_user)):
+    """Obtener inscripciones de los hijos del padre actual"""
+    if current_user.role != UserRole.PADRE:
+        raise HTTPException(status_code=403, detail="Only parents can access this endpoint")
+    
+    # Obtener hijos del padre
+    estudiantes = await db.estudiantes.find({"padre_id": current_user.id}).to_list(1000)
+    estudiantes_ids = [e["id"] for e in estudiantes]
+    
+    if not estudiantes_ids:
+        return []
+    
+    # Obtener inscripciones de los hijos
+    inscripciones = await db.inscripciones.find(
+        {"estudiante_id": {"$in": estudiantes_ids}}
+    ).to_list(1000)
+    
+    # Enriquecer con información de actividades y estudiantes
+    actividades = await db.actividades.find().to_list(1000)
+    actividades_map = {a["id"]: a for a in actividades}
+    estudiantes_map = {e["id"]: e for e in estudiantes}
+    
+    inscripciones_enriquecidas = []
+    for inscripcion in inscripciones:
+        actividad = actividades_map.get(inscripcion["actividad_id"])
+        estudiante = estudiantes_map.get(inscripcion["estudiante_id"])
+        
+        inscripcion_info = {
+            **inscripcion,
+            "actividad_nombre": actividad["nombre"] if actividad else "N/A",
+            "estudiante_nombre": estudiante["nombre_completo"] if estudiante else "N/A"
+        }
+        inscripciones_enriquecidas.append(inscripcion_info)
+    
+    return inscripciones_enriquecidas
+
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.2 + Sistema de Comunicación"}
+    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.3 + Sistema de Comunicación + Interfaces Padres"}
 
 # Include router
 app.include_router(api_router)
