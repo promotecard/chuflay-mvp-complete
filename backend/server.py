@@ -1239,6 +1239,18 @@ async def get_messages(current_user: User = Depends(get_current_user)):
         query["colegio_id"] = current_user.colegio_id
     
     mensajes = await db.mensajes.find(query).sort("created_at", -1).to_list(1000)
+    
+    # Convert ISO string dates back to datetime objects for Pydantic
+    for mensaje in mensajes:
+        if mensaje.get("created_at") and isinstance(mensaje["created_at"], str):
+            mensaje["created_at"] = datetime.fromisoformat(mensaje["created_at"])
+        if mensaje.get("updated_at") and isinstance(mensaje["updated_at"], str):
+            mensaje["updated_at"] = datetime.fromisoformat(mensaje["updated_at"])
+        if mensaje.get("fecha_programada") and isinstance(mensaje["fecha_programada"], str):
+            mensaje["fecha_programada"] = datetime.fromisoformat(mensaje["fecha_programada"])
+        if mensaje.get("fecha_enviado") and isinstance(mensaje["fecha_enviado"], str):
+            mensaje["fecha_enviado"] = datetime.fromisoformat(mensaje["fecha_enviado"])
+    
     return [Message(**mensaje) for mensaje in mensajes]
 
 @api_router.post("/comunicacion/mensajes", response_model=Message)
