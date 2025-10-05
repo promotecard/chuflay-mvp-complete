@@ -1291,9 +1291,14 @@ async def update_message(mensaje_id: str, update_data: MessageUpdate, current_us
     if update_dict.get("fecha_programada"):
         update_dict["fecha_programada"] = update_dict["fecha_programada"].isoformat()
     
-    await db.mensajes.update_one({"id": mensaje_id}, {"$set": update_dict})
+    result = await db.mensajes.update_one({"id": mensaje_id}, {"$set": update_dict})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found during update")
     
     updated_mensaje = await db.mensajes.find_one({"id": mensaje_id})
+    if not updated_mensaje:
+        raise HTTPException(status_code=404, detail="Message not found after update")
+    
     return Message(**updated_mensaje)
 
 @api_router.post("/comunicacion/mensajes/{mensaje_id}/enviar")
