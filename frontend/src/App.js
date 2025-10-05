@@ -3584,7 +3584,7 @@ const App = () => {
             path="/actividades" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Actividades del Colegio" />
+                <ActividadesPage />
               </ProtectedRoute>
             } 
           />
@@ -3592,7 +3592,7 @@ const App = () => {
             path="/mis-hijos" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Mis Hijos" />
+                <MisHijosPage />
               </ProtectedRoute>
             } 
           />
@@ -3600,7 +3600,7 @@ const App = () => {
             path="/mis-inscripciones" 
             element={
               <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Mis Inscripciones" />
+                <MisInscripcionesPage />
               </ProtectedRoute>
             } 
           />
