@@ -1342,7 +1342,7 @@ async def send_message(mensaje_id: str, current_user: User = Depends(get_current
             "mensaje_id": mensaje_id,
             "usuario_id": usuario["id"],
             "usuario_email": usuario["email"],
-            "usuario_nombre": usuario["nombre_completo"],
+            "usuario_nombre": usuario["full_name"],
             "estado": NotificationStatus.NO_LEIDA,
             "created_at": datetime.utcnow().isoformat(),
             "confirmado": False
