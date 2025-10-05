@@ -1253,7 +1253,7 @@ async def create_message(message_data: MessageCreate, current_user: User = Depen
         "id": str(uuid.uuid4()),
         "colegio_id": current_user.colegio_id,
         "autor_id": current_user.id,
-        "autor_nombre": current_user.nombre_completo,
+        "autor_nombre": current_user.full_name,
         "estado": MessageStatus.BORRADOR,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
