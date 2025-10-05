@@ -1226,6 +1226,267 @@ async def get_payment_reports(current_user: User = Depends(get_current_user)):
         }
     }
 
+# Communication System Endpoints
+
+@api_router.get("/comunicacion/mensajes", response_model=List[Message])
+async def get_messages(current_user: User = Depends(get_current_user)):
+    """Obtener mensajes del colegio"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        query["colegio_id"] = current_user.colegio_id
+    
+    mensajes = await db.mensajes.find(query).sort("created_at", -1).to_list(1000)
+    return [Message(**mensaje) for mensaje in mensajes]
+
+@api_router.post("/comunicacion/mensajes", response_model=Message)
+async def create_message(message_data: MessageCreate, current_user: User = Depends(get_current_user)):
+    """Crear nuevo mensaje/circular/comunicado"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Preparar datos del mensaje
+    message_dict = message_data.dict()
+    message_dict.update({
+        "id": str(uuid.uuid4()),
+        "colegio_id": current_user.colegio_id,
+        "autor_id": current_user.id,
+        "autor_nombre": current_user.nombre_completo,
+        "estado": MessageStatus.BORRADOR,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+        "total_destinatarios": 0,
+        "total_leidos": 0
+    })
+    
+    # Serializar datetime objects
+    if message_dict.get("fecha_programada"):
+        message_dict["fecha_programada"] = message_dict["fecha_programada"].isoformat()
+    message_dict["created_at"] = message_dict["created_at"].isoformat()
+    message_dict["updated_at"] = message_dict["updated_at"].isoformat()
+    
+    await db.mensajes.insert_one(message_dict)
+    return Message(**message_dict)
+
+@api_router.put("/comunicacion/mensajes/{mensaje_id}", response_model=Message)
+async def update_message(mensaje_id: str, update_data: MessageUpdate, current_user: User = Depends(get_current_user)):
+    """Actualizar mensaje"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad del mensaje
+    mensaje = await db.mensajes.find_one({"id": mensaje_id})
+    if not mensaje:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and mensaje["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Preparar actualizaciones
+    update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow().isoformat()
+    
+    if update_dict.get("fecha_programada"):
+        update_dict["fecha_programada"] = update_dict["fecha_programada"].isoformat()
+    
+    await db.mensajes.update_one({"id": mensaje_id}, {"$set": update_dict})
+    
+    updated_mensaje = await db.mensajes.find_one({"id": mensaje_id})
+    return Message(**updated_mensaje)
+
+@api_router.post("/comunicacion/mensajes/{mensaje_id}/enviar")
+async def send_message(mensaje_id: str, current_user: User = Depends(get_current_user)):
+    """Enviar mensaje a destinatarios"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Obtener mensaje
+    mensaje = await db.mensajes.find_one({"id": mensaje_id})
+    if not mensaje:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and mensaje["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Obtener destinatarios
+    destinatarios = []
+    
+    # Usuarios específicos
+    if mensaje.get("usuarios_especificos"):
+        usuarios_especificos = await db.users.find(
+            {"id": {"$in": mensaje["usuarios_especificos"]}}
+        ).to_list(1000)
+        destinatarios.extend(usuarios_especificos)
+    
+    # Por roles
+    if mensaje.get("dirigida_a"):
+        usuarios_por_rol = await db.users.find({
+            "role": {"$in": mensaje["dirigida_a"]},
+            "colegio_id": mensaje["colegio_id"]
+        }).to_list(1000)
+        destinatarios.extend(usuarios_por_rol)
+    
+    # Eliminar duplicados
+    usuarios_unicos = {}
+    for usuario in destinatarios:
+        usuarios_unicos[usuario["id"]] = usuario
+    destinatarios_finales = list(usuarios_unicos.values())
+    
+    # Crear notificaciones para cada destinatario
+    notificaciones = []
+    for usuario in destinatarios_finales:
+        notificacion = {
+            "id": str(uuid.uuid4()),
+            "mensaje_id": mensaje_id,
+            "usuario_id": usuario["id"],
+            "usuario_email": usuario["email"],
+            "usuario_nombre": usuario["nombre_completo"],
+            "estado": NotificationStatus.NO_LEIDA,
+            "created_at": datetime.utcnow().isoformat(),
+            "confirmado": False
+        }
+        notificaciones.append(notificacion)
+    
+    if notificaciones:
+        await db.notificaciones_comunicacion.insert_many(notificaciones)
+    
+    # Actualizar mensaje como enviado
+    await db.mensajes.update_one(
+        {"id": mensaje_id},
+        {
+            "$set": {
+                "estado": MessageStatus.ENVIADO,
+                "fecha_enviado": datetime.utcnow().isoformat(),
+                "total_destinatarios": len(destinatarios_finales),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    
+    return {"message": f"Mensaje enviado a {len(destinatarios_finales)} destinatarios"}
+
+@api_router.get("/comunicacion/notificaciones")
+async def get_user_notifications(current_user: User = Depends(get_current_user)):
+    """Obtener notificaciones del usuario actual"""
+    notificaciones = await db.notificaciones_comunicacion.find(
+        {"usuario_id": current_user.id}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    # Enriquecer con información del mensaje
+    for notif in notificaciones:
+        mensaje = await db.mensajes.find_one({"id": notif["mensaje_id"]})
+        if mensaje:
+            notif["mensaje_titulo"] = mensaje["titulo"]
+            notif["mensaje_tipo"] = mensaje["tipo"]
+            notif["mensaje_prioridad"] = mensaje["prioridad"]
+    
+    return notificaciones
+
+@api_router.put("/comunicacion/notificaciones/{notificacion_id}/leer")
+async def mark_notification_read(notificacion_id: str, read_data: NotificationRead, current_user: User = Depends(get_current_user)):
+    """Marcar notificación como leída"""
+    # Verificar que la notificación pertenece al usuario
+    notificacion = await db.notificaciones_comunicacion.find_one({
+        "id": notificacion_id,
+        "usuario_id": current_user.id
+    })
+    
+    if not notificacion:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    update_data = {
+        "estado": NotificationStatus.LEIDA,
+        "fecha_leido": datetime.utcnow().isoformat()
+    }
+    
+    if read_data.confirmacion:
+        update_data.update({
+            "confirmado": True,
+            "fecha_confirmacion": datetime.utcnow().isoformat()
+        })
+    
+    await db.notificaciones_comunicacion.update_one(
+        {"id": notificacion_id},
+        {"$set": update_data}
+    )
+    
+    # Actualizar estadísticas del mensaje
+    mensaje_id = notificacion["mensaje_id"]
+    total_leidos = await db.notificaciones_comunicacion.count_documents({
+        "mensaje_id": mensaje_id,
+        "estado": NotificationStatus.LEIDA
+    })
+    
+    await db.mensajes.update_one(
+        {"id": mensaje_id},
+        {"$set": {"total_leidos": total_leidos}}
+    )
+    
+    return {"message": "Notification marked as read"}
+
+@api_router.delete("/comunicacion/mensajes/{mensaje_id}")
+async def delete_message(mensaje_id: str, current_user: User = Depends(get_current_user)):
+    """Eliminar mensaje"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad del mensaje
+    mensaje = await db.mensajes.find_one({"id": mensaje_id})
+    if not mensaje:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and mensaje["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Eliminar mensaje y notificaciones relacionadas
+    await db.mensajes.delete_one({"id": mensaje_id})
+    await db.notificaciones_comunicacion.delete_many({"mensaje_id": mensaje_id})
+    
+    return {"message": "Message deleted successfully"}
+
+@api_router.get("/comunicacion/estadisticas", response_model=CommunicationStats)
+async def get_communication_stats(current_user: User = Depends(get_current_user)):
+    """Obtener estadísticas de comunicación"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        query["colegio_id"] = current_user.colegio_id
+    
+    # Contar mensajes por estado
+    mensajes = await db.mensajes.find(query).to_list(1000)
+    
+    total_mensajes = len(mensajes)
+    mensajes_enviados = len([m for m in mensajes if m["estado"] == MessageStatus.ENVIADO])
+    mensajes_borradores = len([m for m in mensajes if m["estado"] == MessageStatus.BORRADOR])
+    mensajes_programados = len([m for m in mensajes if m["estado"] == MessageStatus.PROGRAMADO])
+    
+    # Contar mensajes por tipo
+    mensajes_por_tipo = {}
+    for mensaje in mensajes:
+        tipo = mensaje["tipo"]
+        mensajes_por_tipo[tipo] = mensajes_por_tipo.get(tipo, 0) + 1
+    
+    # Calcular tasa de lectura promedio
+    tasa_lectura_promedio = 0.0
+    if mensajes_enviados > 0:
+        total_lecturas = sum([m.get("total_leidos", 0) for m in mensajes if m["estado"] == MessageStatus.ENVIADO])
+        total_destinatarios = sum([m.get("total_destinatarios", 0) for m in mensajes if m["estado"] == MessageStatus.ENVIADO])
+        if total_destinatarios > 0:
+            tasa_lectura_promedio = (total_lecturas / total_destinatarios) * 100
+    
+    return CommunicationStats(
+        total_mensajes=total_mensajes,
+        mensajes_enviados=mensajes_enviados,
+        mensajes_borradores=mensajes_borradores,
+        mensajes_programados=mensajes_programados,
+        tasa_lectura_promedio=round(tasa_lectura_promedio, 2),
+        mensajes_por_tipo=mensajes_por_tipo
+    )
+
 # Test endpoint
 @api_router.get("/")
 async def root():
