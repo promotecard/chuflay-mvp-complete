@@ -385,6 +385,66 @@ class CircularCreate(BaseModel):
     prioridad: str = "normal"
     requiere_confirmacion: bool = False
 
+# Enhanced Communication Models
+class Message(BaseModel):
+    titulo: str
+    contenido: str
+    tipo: MessageType
+    prioridad: MessagePriority = MessagePriority.MEDIA
+    estado: MessageStatus = MessageStatus.BORRADOR
+    colegio_id: str
+    autor_id: str
+    autor_nombre: str
+    dirigida_a: List[UserRole] = []
+    usuarios_especificos: List[str] = []  # IDs de usuarios específicos
+    cursos_objetivo: List[str] = []
+    adjuntos: List[str] = []
+    fecha_programada: Optional[datetime] = None
+    fecha_enviado: Optional[datetime] = None
+    requiere_confirmacion: bool = False
+    total_destinatarios: int = 0
+    total_leidos: int = 0
+
+class MessageCreate(BaseModel):
+    titulo: str
+    contenido: str
+    tipo: MessageType
+    prioridad: MessagePriority = MessagePriority.MEDIA
+    dirigida_a: List[UserRole] = []
+    usuarios_especificos: List[str] = []
+    cursos_objetivo: List[str] = []
+    adjuntos: List[str] = []
+    fecha_programada: Optional[datetime] = None
+    requiere_confirmacion: bool = False
+
+class MessageUpdate(BaseModel):
+    titulo: Optional[str] = None
+    contenido: Optional[str] = None
+    prioridad: Optional[MessagePriority] = None
+    estado: Optional[MessageStatus] = None
+    fecha_programada: Optional[datetime] = None
+
+class UserNotification(BaseModel):
+    mensaje_id: str
+    usuario_id: str
+    usuario_email: str
+    usuario_nombre: str
+    estado: NotificationStatus = NotificationStatus.NO_LEIDA
+    fecha_leido: Optional[datetime] = None
+    confirmado: bool = False
+    fecha_confirmacion: Optional[datetime] = None
+
+class NotificationRead(BaseModel):
+    confirmacion: bool = False
+
+class CommunicationStats(BaseModel):
+    total_mensajes: int
+    mensajes_enviados: int
+    mensajes_borradores: int
+    mensajes_programados: int
+    tasa_lectura_promedio: float
+    mensajes_por_tipo: Dict[str, int]
+
 # Helper functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
