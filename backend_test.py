@@ -638,14 +638,14 @@ class ChuflayBackendTester:
     
     def test_communication_system_send_message(self) -> bool:
         """Test sending messages to recipients"""
-        if not self.admin_colegio_token or not hasattr(self, 'test_message_id'):
+        if not self.admin_colegio_token or not hasattr(self, 'test_comunicado_id'):
             self.log_test("Communication - Send Message", False, "No token or message ID")
             return False
         
         headers = {"Authorization": f"Bearer {self.admin_colegio_token}"}
         
         try:
-            response = self.session.post(f"{self.base_url}/comunicacion/mensajes/{self.test_message_id}/enviar", headers=headers)
+            response = self.session.post(f"{self.base_url}/comunicacion/mensajes/{self.test_comunicado_id}/enviar", headers=headers)
             if response.status_code == 200:
                 result = response.json()
                 self.log_test("Communication - Send Message", True, f"Message sent: {result['message']}")
