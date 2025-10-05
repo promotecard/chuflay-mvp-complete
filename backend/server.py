@@ -1299,6 +1299,16 @@ async def update_message(mensaje_id: str, update_data: MessageUpdate, current_us
     if not updated_mensaje:
         raise HTTPException(status_code=404, detail="Message not found after update")
     
+    # Convert ISO string dates back to datetime objects for Pydantic
+    if updated_mensaje.get("created_at") and isinstance(updated_mensaje["created_at"], str):
+        updated_mensaje["created_at"] = datetime.fromisoformat(updated_mensaje["created_at"])
+    if updated_mensaje.get("updated_at") and isinstance(updated_mensaje["updated_at"], str):
+        updated_mensaje["updated_at"] = datetime.fromisoformat(updated_mensaje["updated_at"])
+    if updated_mensaje.get("fecha_programada") and isinstance(updated_mensaje["fecha_programada"], str):
+        updated_mensaje["fecha_programada"] = datetime.fromisoformat(updated_mensaje["fecha_programada"])
+    if updated_mensaje.get("fecha_enviado") and isinstance(updated_mensaje["fecha_enviado"], str):
+        updated_mensaje["fecha_enviado"] = datetime.fromisoformat(updated_mensaje["fecha_enviado"])
+    
     return Message(**updated_mensaje)
 
 @api_router.post("/comunicacion/mensajes/{mensaje_id}/enviar")
