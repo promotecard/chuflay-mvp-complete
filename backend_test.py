@@ -463,30 +463,37 @@ class ChuflayBackendTester:
             return False
         
         try:
-            # Update admin colegio user to assign college
-            headers = {"Authorization": f"Bearer {self.global_admin_token}"}
+            # Create a new admin colegio user with college assignment
+            admin_colegio_data = {
+                "email": "admin-with-college@colegio-test.edu",
+                "password": "AdminColegio123!",
+                "role": "admin_colegio",
+                "full_name": "Admin Colegio With College",
+                "colegio_id": self.test_colegio_id
+            }
             
-            # Get all users to find admin colegio
-            response = self.session.get(f"{self.base_url}/global/usuarios", headers=headers)
-            if response.status_code != 200:
-                self.log_test("Setup Admin Colegio", False, "Failed to get users")
+            response = self.session.post(f"{self.base_url}/auth/register", json=admin_colegio_data)
+            if response.status_code in [200, 400]:  # 400 if already exists
+                self.log_test("Create Admin Colegio With College", True, "User created or already exists")
+            else:
+                self.log_test("Create Admin Colegio With College", False, f"Status: {response.status_code}")
                 return False
             
-            users = response.json()
-            admin_colegio_user = None
-            for user in users:
-                if user['email'] == 'admin@colegio-test.edu':
-                    admin_colegio_user = user
-                    break
+            # Login with the new admin colegio user
+            login_data = {
+                "email": "admin-with-college@colegio-test.edu",
+                "password": "AdminColegio123!"
+            }
             
-            if not admin_colegio_user:
-                self.log_test("Setup Admin Colegio", False, "Admin colegio user not found")
+            response = self.session.post(f"{self.base_url}/auth/login", json=login_data)
+            if response.status_code == 200:
+                data = response.json()
+                self.admin_colegio_token = data['access_token']
+                self.log_test("Login Admin Colegio With College", True, "Token obtained")
+                return True
+            else:
+                self.log_test("Login Admin Colegio With College", False, f"Status: {response.status_code}")
                 return False
-            
-            # For testing purposes, we'll assume the college assignment is handled
-            # by updating the user record directly in the database or through admin interface
-            self.log_test("Setup Admin Colegio", True, f"Admin colegio ready for college {self.test_colegio_id}")
-            return True
             
         except Exception as e:
             self.log_test("Setup Admin Colegio", False, f"Error: {str(e)}")
