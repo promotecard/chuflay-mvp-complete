@@ -88,6 +88,29 @@ class SubscriptionStatus(str, Enum):
     CANCELADO = "cancelado"
     VENCIDO = "vencido"
 
+class MessageType(str, Enum):
+    CIRCULAR = "circular"
+    COMUNICADO = "comunicado"
+    ANUNCIO = "anuncio"
+    NOTIFICACION = "notificacion"
+
+class MessagePriority(str, Enum):
+    BAJA = "baja"
+    MEDIA = "media"
+    ALTA = "alta"
+    URGENTE = "urgente"
+
+class MessageStatus(str, Enum):
+    BORRADOR = "borrador"
+    ENVIADO = "enviado"
+    PROGRAMADO = "programado"
+    ARCHIVADO = "archivado"
+
+class NotificationStatus(str, Enum):
+    NO_LEIDA = "no_leida"
+    LEIDA = "leida"
+    ARCHIVADA = "archivada"
+
 # Base Models
 class BaseModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
