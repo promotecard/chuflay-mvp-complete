@@ -304,6 +304,30 @@ frontend:
         agent: "testing"
         comment: "Enhanced Activity Form fully tested and working. AdminActividades component successfully renders comprehensive form with all fields: name, description, date, location, time slots, capacity, cost, category, responsable. Custom fields functionality working (add/remove dynamic fields). Image upload interface present and functional. Form validation working. Modal opens/closes correctly. Tested activity creation process successfully with Admin Colegio user."
 
+  - task: "Communication System Backend"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented complete communication system backend: 8 new APIs (/comunicacion/mensajes CRUD, /enviar, /notificaciones, /estadisticas). New models: Message, UserNotification, CommunicationStats with enums for MessageType, MessagePriority, MessageStatus, NotificationStatus. Supports circulars, announcements, notifications with role-based targeting and confirmation tracking."
+
+  - task: "Communication System Frontend"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented complete communication frontend: AdminComunicacion component (create, edit, send messages with statistics dashboard, role-based targeting, priority management), Comunicados component (read and confirm messages for parents/students). Updated routes /admin/comunicacion and /comunicados. Interactive forms with message types, priorities, confirmation requirements."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
