@@ -3153,8 +3153,8 @@ const App = () => {
           <Route 
             path="/comunicados" 
             element={
-              <ProtectedRoute allowedRoles={['padre']}>
-                <ComingSoon title="Comunicados" />
+              <ProtectedRoute allowedRoles={['padre', 'estudiante', 'profesor']}>
+                <Comunicados />
               </ProtectedRoute>
             } 
           />
