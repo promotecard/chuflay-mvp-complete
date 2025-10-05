@@ -1309,7 +1309,10 @@ async def update_message(mensaje_id: str, update_data: MessageUpdate, current_us
     
     updated_mensaje = await db.mensajes.find_one({"id": mensaje_id})
     if not updated_mensaje:
-        raise HTTPException(status_code=404, detail="Message not found after update")
+        # Debug: Check if message exists at all
+        all_messages = await db.mensajes.find({}).to_list(10)
+        message_ids = [m.get("id") for m in all_messages]
+        raise HTTPException(status_code=404, detail=f"Message not found after update. Available IDs: {message_ids[:3]}")
     
     # Convert ISO string dates back to datetime objects for Pydantic
     if updated_mensaje.get("created_at") and isinstance(updated_mensaje["created_at"], str):
