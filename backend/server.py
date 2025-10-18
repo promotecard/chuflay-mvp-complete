@@ -2391,6 +2391,182 @@ async def delete_catalog(catalogo_id: str, current_user: User = Depends(get_curr
     await db.catalogos.delete_one({"id": catalogo_id})
     return {"message": "Catalog deleted successfully"}
 
+# Student and Course Management System
+@api_router.get("/cursos", response_model=List[Curso])
+async def get_courses(current_user: User = Depends(get_current_user)):
+    """Obtener cursos del colegio"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL, UserRole.PROFESOR]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        query["colegio_id"] = current_user.colegio_id
+    elif current_user.role == UserRole.PROFESOR:
+        query["colegio_id"] = current_user.colegio_id
+    
+    cursos = await db.cursos.find(query).to_list(1000)
+    return [Curso(**curso) for curso in cursos]
+
+@api_router.post("/cursos", response_model=Curso)
+async def create_course(course_data: CursoCreate, current_user: User = Depends(get_current_user)):
+    """Crear nuevo curso"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Obtener nombre del profesor jefe si se proporciona
+    profesor_jefe_nombre = None
+    if course_data.profesor_jefe_id:
+        profesor = await db.users.find_one({"id": course_data.profesor_jefe_id})
+        if profesor:
+            profesor_jefe_nombre = profesor["full_name"]
+    
+    course_dict = course_data.dict()
+    course_dict.update({
+        "id": str(uuid.uuid4()),
+        "colegio_id": current_user.colegio_id,
+        "profesor_jefe_nombre": profesor_jefe_nombre,
+        "created_at": datetime.utcnow().isoformat()
+    })
+    
+    await db.cursos.insert_one(course_dict)
+    return Curso(**course_dict)
+
+@api_router.get("/estudiantes/completos")
+async def get_students_complete(
+    curso_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener estudiantes con información completa"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL, UserRole.PROFESOR]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role in [UserRole.ADMIN_COLEGIO, UserRole.PROFESOR]:
+        # Obtener estudiantes del colegio del usuario
+        estudiantes = await db.estudiantes.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+    else:
+        estudiantes = await db.estudiantes.find().to_list(1000)
+    
+    if curso_id:
+        estudiantes = [e for e in estudiantes if e.get("curso_id") == curso_id]
+    
+    # Enriquecer con información de cursos
+    cursos = await db.cursos.find().to_list(1000)
+    cursos_dict = {c["id"]: c for c in cursos}
+    
+    estudiantes_completos = []
+    for estudiante in estudiantes:
+        curso = cursos_dict.get(estudiante.get("curso_id"))
+        estudiante_info = {
+            **estudiante,
+            "curso_nombre": curso["nombre"] if curso else "Sin curso asignado"
+        }
+        estudiantes_completos.append(estudiante_info)
+    
+    return estudiantes_completos
+
+@api_router.post("/estudiantes/bulk-upload")
+async def bulk_upload_students(
+    upload_data: BulkStudentUpload,
+    current_user: User = Depends(get_current_user)
+):
+    """Carga masiva de estudiantes"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    created_students = []
+    errors = []
+    
+    for i, student_data in enumerate(upload_data.estudiantes):
+        try:
+            student_dict = student_data.dict()
+            student_dict.update({
+                "id": str(uuid.uuid4()),
+                "colegio_id": current_user.colegio_id,
+                "estado": "activo",
+                "año_ingreso": datetime.utcnow().year,
+                "created_at": datetime.utcnow().isoformat()
+            })
+            
+            await db.estudiantes.insert_one(student_dict)
+            created_students.append(student_dict["nombre_completo"])
+            
+        except Exception as e:
+            errors.append(f"Fila {i+1}: {str(e)}")
+    
+    return {
+        "message": f"Procesados {len(created_students)} estudiantes exitosamente",
+        "created_students": created_students,
+        "errors": errors,
+        "success_count": len(created_students),
+        "error_count": len(errors)
+    }
+
+@api_router.post("/estudiantes/promote")
+async def promote_students(
+    promotion_data: PromotionData,
+    current_user: User = Depends(get_current_user)
+):
+    """Promover estudiantes a nuevo curso/año"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar que el curso existe
+    curso = await db.cursos.find_one({"id": promotion_data.nuevo_curso_id})
+    if not curso:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Actualizar estudiantes
+    result = await db.estudiantes.update_many(
+        {"id": {"$in": promotion_data.estudiante_ids}},
+        {
+            "$set": {
+                "curso_id": promotion_data.nuevo_curso_id,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    
+    return {
+        "message": f"Promovidos {result.modified_count} estudiantes al curso {curso['nombre']}",
+        "promoted_count": result.modified_count
+    }
+
+@api_router.get("/admin/estudiantes/estadisticas")
+async def get_student_stats(current_user: User = Depends(get_current_user)):
+    """Estadísticas de estudiantes"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        query["colegio_id"] = current_user.colegio_id
+    
+    estudiantes = await db.estudiantes.find(query).to_list(1000)
+    cursos = await db.cursos.find({"colegio_id": current_user.colegio_id} if current_user.role == UserRole.ADMIN_COLEGIO else {}).to_list(1000)
+    
+    total_estudiantes = len(estudiantes)
+    estudiantes_activos = len([e for e in estudiantes if e.get("estado") == "activo"])
+    total_cursos = len(cursos)
+    
+    # Estudiantes por curso
+    estudiantes_por_curso = {}
+    for estudiante in estudiantes:
+        curso_id = estudiante.get("curso_id")
+        if curso_id:
+            curso = next((c for c in cursos if c["id"] == curso_id), None)
+            if curso:
+                curso_nombre = curso["nombre"]
+                estudiantes_por_curso[curso_nombre] = estudiantes_por_curso.get(curso_nombre, 0) + 1
+    
+    return {
+        "total_estudiantes": total_estudiantes,
+        "estudiantes_activos": estudiantes_activos,
+        "total_cursos": total_cursos,
+        "estudiantes_por_curso": estudiantes_por_curso,
+        "promedio_por_curso": total_estudiantes / max(total_cursos, 1)
+    }
+
 # Create Test Users Endpoint (for development)
 @api_router.post("/create-test-users")
 async def create_test_users():
