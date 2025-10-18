@@ -581,6 +581,17 @@ class MarketplaceStats(BaseModel):
     ventas_mes: float
     productos_mas_vendidos: List[Dict[str, Any]]
 
+# Catalog Models
+class Catalog(BaseModel):
+    nombre: str
+    descripcion: str
+    colegio_id: str
+    activo: bool = True
+    
+class CatalogCreate(BaseModel):
+    nombre: str
+    descripcion: str
+
 # Helper functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
