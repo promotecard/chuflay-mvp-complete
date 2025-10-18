@@ -697,6 +697,13 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">📅 Calendario</h3>
               <p className="text-gray-600 text-sm">Ve el calendario escolar y eventos</p>
             </Link>
+            <Link 
+              to="/marketplace" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-purple-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">🛍️ Marketplace</h3>
+              <p className="text-gray-600 text-sm">Compra productos escolares</p>
+            </Link>
           </>
         )}
       </div>
