@@ -3944,6 +3944,7 @@ const AdminMarketplace = () => {
   useEffect(() => {
     fetchStats();
     fetchProductos();
+    fetchCatalogos();
   }, []);
 
   const fetchStats = async () => {
