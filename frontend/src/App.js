@@ -3466,6 +3466,431 @@ const Comunicados = () => {
   );
 };
 
+// Componente para gestión administrativa de pagos
+const AdminPagos = () => {
+  const [pagos, setPagos] = useState([]);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [filtros, setFiltros] = useState({
+    estado: '',
+    metodo: '',
+    fecha_inicio: '',
+    fecha_fin: ''
+  });
+  const [selectedPayments, setSelectedPayments] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [bulkAction, setBulkAction] = useState({
+    nuevo_estado: 'completado',
+    notas: ''
+  });
+
+  useEffect(() => {
+    fetchStats();
+    fetchPagos();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/pagos/estadisticas`);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching payment stats:', error);
+    }
+  };
+
+  const fetchPagos = async () => {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      
+      const response = await axios.get(`${API}/admin/pagos/listado?${params}`);
+      setPagos(response.data);
+    } catch (error) {
+      console.error('Error fetching pagos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedPayments.length === 0) return;
+    
+    try {
+      await axios.put(`${API}/admin/pagos/bulk-update`, {
+        payment_ids: selectedPayments,
+        nuevo_estado: bulkAction.nuevo_estado,
+        notas: bulkAction.notas
+      });
+      
+      setShowBulkModal(false);
+      setSelectedPayments([]);
+      setBulkAction({ nuevo_estado: 'completado', notas: '' });
+      fetchPagos();
+      fetchStats();
+      alert('Pagos actualizados exitosamente');
+    } catch (error) {
+      console.error('Error updating payments:', error);
+      alert('Error al actualizar pagos');
+    }
+  };
+
+  const handleManualConfirm = async (paymentId) => {
+    if (window.confirm('¿Confirmar este pago manualmente?')) {
+      try {
+        await axios.post(`${API}/admin/pagos/${paymentId}/manual-confirm`);
+        fetchPagos();
+        fetchStats();
+        alert('Pago confirmado exitosamente');
+      } catch (error) {
+        console.error('Error confirming payment:', error);
+        alert('Error al confirmar pago');
+      }
+    }
+  };
+
+  const getStatusBadge = (estado) => {
+    const colors = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      procesando: 'bg-blue-100 text-blue-800',
+      completado: 'bg-green-100 text-green-800',
+      fallido: 'bg-red-100 text-red-800',
+      reembolsado: 'bg-gray-100 text-gray-800'
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getMethodBadge = (metodo) => {
+    const colors = {
+      tarjeta: 'bg-blue-100 text-blue-800',
+      transferencia: 'bg-green-100 text-green-800',
+      efectivo: 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[metodo] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Pagos">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Pagos">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-blue-600">{stats.total_pagos || 0}</div>
+          <div className="text-gray-600 text-sm">Total Pagos</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-green-600">{stats.pagos_completados || 0}</div>
+          <div className="text-gray-600 text-sm">Pagos Completados</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-yellow-600">{stats.pagos_pendientes || 0}</div>
+          <div className="text-gray-600 text-sm">Pagos Pendientes</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-purple-600">${stats.ingresos_totales || 0}</div>
+          <div className="text-gray-600 text-sm">Ingresos Totales</div>
+        </div>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+            <select
+              value={filtros.estado}
+              onChange={(e) => setFiltros({...filtros, estado: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="completado">Completado</option>
+              <option value="fallido">Fallido</option>
+              <option value="procesando">Procesando</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Método</label>
+            <select
+              value={filtros.metodo}
+              onChange={(e) => setFiltros({...filtros, metodo: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Inicio</label>
+            <input
+              type="date"
+              value={filtros.fecha_inicio}
+              onChange={(e) => setFiltros({...filtros, fecha_inicio: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Fin</label>
+            <input
+              type="date"
+              value={filtros.fecha_fin}
+              onChange={(e) => setFiltros({...filtros, fecha_fin: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={fetchPagos}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Filtrar
+            </button>
+          </div>
+        </div>
+
+        <div className="flex space-x-3">
+          {selectedPayments.length > 0 && (
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Actualizar Seleccionados ({selectedPayments.length})
+            </button>
+          )}
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            📊 Generar Reporte
+          </button>
+        </div>
+      </div>
+
+      {/* Payments Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={selectedPayments.length === pagos.length && pagos.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedPayments(pagos.map(p => p.id));
+                    } else {
+                      setSelectedPayments([]);
+                    }
+                  }}
+                />
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pago
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estudiante
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actividad
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Método
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {pagos.map((pago) => (
+              <tr key={pago.id} className={selectedPayments.includes(pago.id) ? 'bg-blue-50' : ''}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={selectedPayments.includes(pago.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedPayments([...selectedPayments, pago.id]);
+                      } else {
+                        setSelectedPayments(selectedPayments.filter(id => id !== pago.id));
+                      }
+                    }}
+                  />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">${pago.monto}</div>
+                    <div className="text-sm text-gray-500">{new Date(pago.created_at).toLocaleDateString()}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div>
+                    <div className="text-sm text-gray-900">{pago.estudiante_nombre}</div>
+                    <div className="text-sm text-gray-500">{pago.curso_grado}</div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {pago.actividad_nombre}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMethodBadge(pago.metodo_pago)}`}>
+                    {pago.metodo_pago}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(pago.estado)}`}>
+                    {pago.estado}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {(pago.estado === 'pendiente' && (pago.metodo_pago === 'efectivo' || pago.metodo_pago === 'transferencia')) && (
+                    <button
+                      onClick={() => handleManualConfirm(pago.id)}
+                      className="text-green-600 hover:text-green-900 mr-3"
+                    >
+                      Confirmar
+                    </button>
+                  )}
+                  <button className="text-blue-600 hover:text-blue-900">
+                    Ver Detalle
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bulk Update Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Actualizar Pagos Seleccionados
+              </h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nuevo Estado
+                </label>
+                <select
+                  value={bulkAction.nuevo_estado}
+                  onChange={(e) => setBulkAction({...bulkAction, nuevo_estado: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="completado">Completado</option>
+                  <option value="fallido">Fallido</option>
+                  <option value="procesando">Procesando</option>
+                  <option value="reembolsado">Reembolsado</option>
+                </select>
+              </div>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notas (Opcional)
+                </label>
+                <textarea
+                  rows="3"
+                  value={bulkAction.notas}
+                  onChange={(e) => setBulkAction({...bulkAction, notas: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Agregar notas sobre la actualización..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowBulkModal(false)}
+                  className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBulkUpdate}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Generar Reporte</h3>
+              <p className="text-gray-600 mb-4">Selecciona el tipo de reporte a generar:</p>
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => {
+                    // Aquí iría la lógica para generar reporte mensual
+                    alert('Generando reporte mensual...');
+                    setShowReportModal(false);
+                  }}
+                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border"
+                >
+                  <div className="font-medium">Reporte Mensual</div>
+                  <div className="text-sm text-gray-600">Pagos e ingresos del mes actual</div>
+                </button>
+                <button
+                  onClick={() => {
+                    alert('Generando reporte trimestral...');
+                    setShowReportModal(false);
+                  }}
+                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border"
+                >
+                  <div className="font-medium">Reporte Trimestral</div>
+                  <div className="text-sm text-gray-600">Análisis de tendencias trimestrales</div>
+                </button>
+                <button
+                  onClick={() => {
+                    alert('Generando reporte anual...');
+                    setShowReportModal(false);
+                  }}
+                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border"
+                >
+                  <div className="font-medium">Reporte Anual</div>
+                  <div className="text-sm text-gray-600">Resumen completo del año</div>
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
