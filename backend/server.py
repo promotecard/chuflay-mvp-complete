@@ -1601,10 +1601,322 @@ async def get_mis_inscripciones(current_user: User = Depends(get_current_user)):
     
     return inscripciones_enriquecidas
 
+# Payment Administration System Endpoints
+
+@api_router.get("/admin/pagos/estadisticas", response_model=PaymentAdminStats)
+async def get_payment_admin_stats(current_user: User = Depends(get_current_user)):
+    """Obtener estadísticas administrativas de pagos"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Filtrar por colegio si es admin de colegio
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        # Obtener inscripciones del colegio
+        inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+        inscripcion_ids = [i["id"] for i in inscripciones]
+        if inscripcion_ids:
+            query["inscripcion_id"] = {"$in": inscripcion_ids}
+        else:
+            query["inscripcion_id"] = {"$in": []}  # No results
+    
+    pagos = await db.pagos.find(query).to_list(1000)
+    
+    # Calcular estadísticas
+    total_pagos = len(pagos)
+    pagos_completados = len([p for p in pagos if p["estado"] == PaymentStatus.COMPLETADO])
+    pagos_pendientes = len([p for p in pagos if p["estado"] == PaymentStatus.PENDIENTE])
+    pagos_fallidos = len([p for p in pagos if p["estado"] == PaymentStatus.FALLIDO])
+    
+    ingresos_totales = sum([p.get("monto", 0) for p in pagos if p["estado"] == PaymentStatus.COMPLETADO])
+    
+    # Ingresos del mes actual
+    mes_actual = datetime.utcnow().replace(day=1)
+    ingresos_mes_actual = sum([
+        p.get("monto", 0) for p in pagos 
+        if p["estado"] == PaymentStatus.COMPLETADO and 
+        datetime.fromisoformat(p["created_at"]) >= mes_actual
+    ])
+    
+    # Ingresos por método de pago
+    ingresos_por_metodo = {}
+    for pago in pagos:
+        if pago["estado"] == PaymentStatus.COMPLETADO:
+            metodo = pago["metodo_pago"]
+            ingresos_por_metodo[metodo] = ingresos_por_metodo.get(metodo, 0) + pago.get("monto", 0)
+    
+    # Pagos por actividad (necesitamos enriquecer con datos de actividad)
+    pagos_por_actividad = []
+    if pagos:
+        # Obtener inscripciones y actividades para enriquecer
+        inscripciones_dict = {}
+        if current_user.role == UserRole.ADMIN_COLEGIO:
+            inscripciones_data = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+        else:
+            inscripciones_data = await db.inscripciones.find().to_list(1000)
+        
+        for insc in inscripciones_data:
+            inscripciones_dict[insc["id"]] = insc
+        
+        actividades_ids = list(set([insc.get("actividad_id") for insc in inscripciones_data if insc.get("actividad_id")]))
+        actividades = await db.actividades.find({"id": {"$in": actividades_ids}}).to_list(1000)
+        actividades_dict = {act["id"]: act for act in actividades}
+        
+        actividad_ingresos = {}
+        for pago in pagos:
+            if pago["estado"] == PaymentStatus.COMPLETADO:
+                inscripcion = inscripciones_dict.get(pago["inscripcion_id"])
+                if inscripcion:
+                    actividad_id = inscripcion.get("actividad_id")
+                    actividad = actividades_dict.get(actividad_id)
+                    if actividad:
+                        nombre_actividad = actividad["nombre"]
+                        actividad_ingresos[nombre_actividad] = actividad_ingresos.get(nombre_actividad, 0) + pago.get("monto", 0)
+        
+        pagos_por_actividad = [{"actividad": k, "ingresos": v} for k, v in actividad_ingresos.items()]
+        pagos_por_actividad.sort(key=lambda x: x["ingresos"], reverse=True)
+    
+    return PaymentAdminStats(
+        total_pagos=total_pagos,
+        pagos_completados=pagos_completados,
+        pagos_pendientes=pagos_pendientes,
+        pagos_fallidos=pagos_fallidos,
+        ingresos_totales=ingresos_totales,
+        ingresos_mes_actual=ingresos_mes_actual,
+        ingresos_por_metodo=ingresos_por_metodo,
+        pagos_por_actividad=pagos_por_actividad
+    )
+
+@api_router.get("/admin/pagos/listado")
+async def get_admin_payments(
+    filters: PaymentFilters = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener listado de pagos para administración"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Base query
+    query = {}
+    
+    # Filtrar por colegio si es admin de colegio
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+        inscripcion_ids = [i["id"] for i in inscripciones]
+        if inscripcion_ids:
+            query["inscripcion_id"] = {"$in": inscripcion_ids}
+        else:
+            return []  # No results for this college
+    
+    # Aplicar filtros adicionales si se proporcionan
+    if filters:
+        if filters.estado:
+            query["estado"] = filters.estado
+        if filters.metodo:
+            query["metodo_pago"] = filters.metodo
+        if filters.fecha_inicio or filters.fecha_fin:
+            date_query = {}
+            if filters.fecha_inicio:
+                date_query["$gte"] = filters.fecha_inicio.isoformat()
+            if filters.fecha_fin:
+                date_query["$lte"] = filters.fecha_fin.isoformat()
+            if date_query:
+                query["created_at"] = date_query
+    
+    # Obtener pagos
+    pagos = await db.pagos.find(query).sort("created_at", -1).to_list(1000)
+    
+    # Enriquecer con información de inscripciones, estudiantes y actividades
+    pagos_enriquecidos = []
+    if pagos:
+        inscripciones = await db.inscripciones.find().to_list(1000)
+        inscripciones_dict = {i["id"]: i for i in inscripciones}
+        
+        estudiantes = await db.estudiantes.find().to_list(1000)
+        estudiantes_dict = {e["id"]: e for e in estudiantes}
+        
+        actividades = await db.actividades.find().to_list(1000)
+        actividades_dict = {a["id"]: a for a in actividades}
+        
+        for pago in pagos:
+            inscripcion = inscripciones_dict.get(pago["inscripcion_id"])
+            if inscripcion:
+                estudiante = estudiantes_dict.get(inscripcion.get("estudiante_id"))
+                actividad = actividades_dict.get(inscripcion.get("actividad_id"))
+                
+                pago_enriquecido = {
+                    **pago,
+                    "estudiante_nombre": estudiante["nombre_completo"] if estudiante else "N/A",
+                    "actividad_nombre": actividad["nombre"] if actividad else "N/A",
+                    "curso_grado": estudiante["curso_grado"] if estudiante else "N/A"
+                }
+                pagos_enriquecidos.append(pago_enriquecido)
+    
+    return pagos_enriquecidos
+
+@api_router.put("/admin/pagos/bulk-update")
+async def bulk_update_payments(
+    update_data: BulkPaymentUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Actualización masiva de pagos"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar que los pagos pertenezcan al colegio (si es admin de colegio)
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+        inscripcion_ids = [i["id"] for i in inscripciones]
+        
+        pagos_a_actualizar = await db.pagos.find({
+            "id": {"$in": update_data.payment_ids},
+            "inscripcion_id": {"$in": inscripcion_ids}
+        }).to_list(1000)
+        
+        if len(pagos_a_actualizar) != len(update_data.payment_ids):
+            raise HTTPException(status_code=403, detail="Some payments don't belong to your college")
+    
+    # Realizar actualización
+    update_dict = {
+        "estado": update_data.nuevo_estado,
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    if update_data.notas:
+        update_dict["notas_admin"] = update_data.notas
+    
+    result = await db.pagos.update_many(
+        {"id": {"$in": update_data.payment_ids}},
+        {"$set": update_dict}
+    )
+    
+    return {"message": f"Updated {result.modified_count} payments successfully"}
+
+@api_router.get("/admin/pagos/reportes", response_model=PaymentReport)
+async def get_payment_reports(
+    periodo: str = "mensual",  # mensual, trimestral, anual
+    current_user: User = Depends(get_current_user)
+):
+    """Generar reportes de pagos"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Calcular fechas según período
+    now = datetime.utcnow()
+    if periodo == "mensual":
+        fecha_inicio = now.replace(day=1)
+    elif periodo == "trimestral":
+        mes_inicio_trimestre = ((now.month - 1) // 3) * 3 + 1
+        fecha_inicio = now.replace(month=mes_inicio_trimestre, day=1)
+    else:  # anual
+        fecha_inicio = now.replace(month=1, day=1)
+    
+    # Query base para pagos del período
+    query = {
+        "created_at": {"$gte": fecha_inicio.isoformat()}
+    }
+    
+    # Filtrar por colegio si es admin de colegio
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        inscripciones = await db.inscripciones.find({"colegio_id": current_user.colegio_id}).to_list(1000)
+        inscripcion_ids = [i["id"] for i in inscripciones]
+        if inscripcion_ids:
+            query["inscripcion_id"] = {"$in": inscripcion_ids}
+        else:
+            query["inscripcion_id"] = {"$in": []}
+    
+    pagos = await db.pagos.find(query).to_list(1000)
+    
+    # Calcular métricas del reporte
+    total_ingresos = sum([p.get("monto", 0) for p in pagos if p["estado"] == PaymentStatus.COMPLETADO])
+    total_pagos = len(pagos)
+    
+    pagos_por_estado = {}
+    for pago in pagos:
+        estado = pago["estado"]
+        pagos_por_estado[estado] = pagos_por_estado.get(estado, 0) + 1
+    
+    pagos_por_metodo = {}
+    for pago in pagos:
+        metodo = pago["metodo_pago"]
+        pagos_por_metodo[metodo] = pagos_por_metodo.get(metodo, 0) + 1
+    
+    # Ingresos por actividad (simplificado)
+    ingresos_por_actividad = []
+    
+    # Tendencia mensual (últimos 6 meses)
+    tendencia_mensual = []
+    for i in range(6):
+        mes_fecha = now.replace(day=1) - timedelta(days=30*i)
+        mes_siguiente = mes_fecha.replace(month=mes_fecha.month+1 if mes_fecha.month < 12 else 1, 
+                                         year=mes_fecha.year if mes_fecha.month < 12 else mes_fecha.year+1)
+        
+        pagos_mes = [p for p in pagos 
+                    if mes_fecha.isoformat() <= p["created_at"] < mes_siguiente.isoformat()]
+        
+        ingresos_mes = sum([p.get("monto", 0) for p in pagos_mes if p["estado"] == PaymentStatus.COMPLETADO])
+        
+        tendencia_mensual.append({
+            "mes": mes_fecha.strftime("%Y-%m"),
+            "ingresos": ingresos_mes,
+            "pagos": len(pagos_mes)
+        })
+    
+    return PaymentReport(
+        periodo=periodo,
+        total_ingresos=total_ingresos,
+        total_pagos=total_pagos,
+        pagos_por_estado=pagos_por_estado,
+        ingresos_por_actividad=ingresos_por_actividad,
+        pagos_por_metodo=pagos_por_metodo,
+        tendencia_mensual=list(reversed(tendencia_mensual))
+    )
+
+@api_router.post("/admin/pagos/{payment_id}/manual-confirm")
+async def manual_confirm_payment(
+    payment_id: str,
+    notas: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Confirmar pago manualmente (para pagos en efectivo/transferencia)"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar que el pago existe y pertenece al colegio
+    pago = await db.pagos.find_one({"id": payment_id})
+    if not pago:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        inscripcion = await db.inscripciones.find_one({"id": pago["inscripcion_id"]})
+        if not inscripcion or inscripcion["colegio_id"] != current_user.colegio_id:
+            raise HTTPException(status_code=403, detail="Payment doesn't belong to your college")
+    
+    # Actualizar el pago
+    update_data = {
+        "estado": PaymentStatus.COMPLETADO,
+        "fecha_procesamiento": datetime.utcnow().isoformat(),
+        "confirmado_por": current_user.id,
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    if notas:
+        update_data["notas_confirmacion"] = notas
+    
+    await db.pagos.update_one({"id": payment_id}, {"$set": update_data})
+    
+    # Actualizar estado de inscripción si es necesario
+    await db.inscripciones.update_one(
+        {"id": pago["inscripcion_id"]},
+        {"$set": {"estado": InscriptionStatus.CONFIRMADA}}
+    )
+    
+    return {"message": "Payment confirmed successfully"}
+
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo con Admin Global v1.3 + Sistema de Comunicación + Interfaces Padres"}
+    return {"message": "Chuflay API - Sistema Completo v1.4 + Comunicación + Interface Admin Pagos"}
 
 # Include router
 app.include_router(api_router)
