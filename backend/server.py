@@ -518,6 +518,8 @@ class Product(BaseModel):
     proveedor: Optional[str] = None
     estado: ProductStatus = ProductStatus.ACTIVO
     especificaciones: Dict[str, Any] = {}
+    requiere_confirmacion: bool = False
+    catalogo_id: Optional[str] = None
 
 class ProductCreate(BaseModel):
     nombre: str
