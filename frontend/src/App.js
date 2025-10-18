@@ -4755,6 +4755,566 @@ const MarketplacePage = () => {
   );
 };
 
+// Componente para gestión completa de estudiantes (Admin Colegio)
+const AdminEstudiantes = () => {
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [cursos, setCursos] = useState([]);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('lista'); // lista, cursos, carga, promocion
+  const [showModal, setShowModal] = useState(false);
+  const [showCursoModal, setShowCursoModal] = useState(false);
+  const [editingEstudiante, setEditingEstudiante] = useState(null);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [formData, setFormData] = useState({
+    nombre_completo: '',
+    fecha_nacimiento: '',
+    curso_id: '',
+    rut: '',
+    telefono_emergencia: '',
+    direccion: '',
+    alergias: '',
+    medicamentos: '',
+    observaciones: ''
+  });
+  const [cursoData, setCursoData] = useState({
+    nombre: '',
+    nivel: 'Básico',
+    grado: 1,
+    seccion: 'A',
+    año_escolar: new Date().getFullYear(),
+    capacidad_maxima: 30,
+    profesor_jefe_id: ''
+  });
+  const [bulkData, setBulkData] = useState('');
+
+  useEffect(() => {
+    fetchEstudiantes();
+    fetchCursos();
+    fetchStats();
+  }, []);
+
+  const fetchEstudiantes = async () => {
+    try {
+      const response = await axios.get(`${API}/estudiantes/completos`);
+      setEstudiantes(response.data);
+    } catch (error) {
+      console.error('Error fetching estudiantes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCursos = async () => {
+    try {
+      const response = await axios.get(`${API}/cursos`);
+      setCursos(response.data);
+    } catch (error) {
+      console.error('Error fetching cursos:', error);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/estudiantes/estadisticas`);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching student stats:', error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      if (editingEstudiante) {
+        await axios.put(`${API}/estudiantes/${editingEstudiante.id}`, formData);
+      } else {
+        await axios.post(`${API}/estudiantes`, formData);
+      }
+      
+      setShowModal(false);
+      setEditingEstudiante(null);
+      resetForm();
+      fetchEstudiantes();
+      fetchStats();
+    } catch (error) {
+      console.error('Error saving estudiante:', error);
+      alert('Error al guardar estudiante');
+    }
+  };
+
+  const handleCursoSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await axios.post(`${API}/cursos`, cursoData);
+      setShowCursoModal(false);
+      setCursoData({
+        nombre: '',
+        nivel: 'Básico',
+        grado: 1,
+        seccion: 'A',
+        año_escolar: new Date().getFullYear(),
+        capacidad_maxima: 30,
+        profesor_jefe_id: ''
+      });
+      fetchCursos();
+    } catch (error) {
+      console.error('Error creating curso:', error);
+      alert('Error al crear curso');
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!bulkData.trim()) return;
+    
+    try {
+      const lines = bulkData.trim().split('\n');
+      const estudiantes = lines.map(line => {
+        const parts = line.split(',').map(p => p.trim());
+        return {
+          nombre_completo: parts[0] || '',
+          fecha_nacimiento: parts[1] || '',
+          curso_id: parts[2] || '',
+          rut: parts[3] || '',
+          telefono_emergencia: parts[4] || '',
+          direccion: parts[5] || '',
+          alergias: parts[6] || '',
+          medicamentos: parts[7] || '',
+          observaciones: parts[8] || ''
+        };
+      });
+      
+      const response = await axios.post(`${API}/estudiantes/bulk-upload`, { estudiantes });
+      alert(`${response.data.success_count} estudiantes creados exitosamente`);
+      setBulkData('');
+      fetchEstudiantes();
+      fetchStats();
+      
+      if (response.data.errors.length > 0) {
+        console.log('Errores:', response.data.errors);
+      }
+    } catch (error) {
+      console.error('Error in bulk upload:', error);
+      alert('Error en carga masiva');
+    }
+  };
+
+  const handlePromotion = async (nuevoCursoId) => {
+    if (selectedStudents.length === 0) return;
+    
+    try {
+      await axios.post(`${API}/estudiantes/promote`, {
+        estudiante_ids: selectedStudents,
+        nuevo_curso_id: nuevoCursoId,
+        nuevo_año: new Date().getFullYear() + 1
+      });
+      
+      alert(`${selectedStudents.length} estudiantes promovidos exitosamente`);
+      setSelectedStudents([]);
+      fetchEstudiantes();
+    } catch (error) {
+      console.error('Error promoting students:', error);
+      alert('Error al promover estudiantes');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      nombre_completo: '',
+      fecha_nacimiento: '',
+      curso_id: '',
+      rut: '',
+      telefono_emergencia: '',
+      direccion: '',
+      alergias: '',
+      medicamentos: '',
+      observaciones: ''
+    });
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Gestión de Estudiantes">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Gestión de Estudiantes">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-blue-600">{stats.total_estudiantes || 0}</div>
+          <div className="text-gray-600 text-sm">Total Estudiantes</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-green-600">{stats.estudiantes_activos || 0}</div>
+          <div className="text-gray-600 text-sm">Estudiantes Activos</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-purple-600">{stats.total_cursos || 0}</div>
+          <div className="text-gray-600 text-sm">Total Cursos</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-orange-600">{Math.round(stats.promedio_por_curso || 0)}</div>
+          <div className="text-gray-600 text-sm">Promedio por Curso</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6">
+            {[
+              { id: 'lista', name: '👥 Lista de Estudiantes' },
+              { id: 'cursos', name: '🏫 Cursos' },
+              { id: 'carga', name: '📄 Carga Masiva' },
+              { id: 'promocion', name: '🎓 Promoción' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-4 text-sm font-medium border-b-2 ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-6">
+          {/* Lista de Estudiantes */}
+          {activeTab === 'lista' && (
+            <div>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >
+                  + Nuevo Estudiante
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estudiante
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Curso
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contacto
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estado
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {estudiantes.map((estudiante) => (
+                      <tr key={estudiante.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{estudiante.nombre_completo}</div>
+                            <div className="text-sm text-gray-500">{estudiante.rut}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {estudiante.curso_nombre}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {estudiante.telefono_emergencia}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            {estudiante.estado}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button className="text-blue-600 hover:text-blue-900 mr-3">
+                            Editar
+                          </button>
+                          <button className="text-red-600 hover:text-red-900">
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Cursos */}
+          {activeTab === 'cursos' && (
+            <div>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => setShowCursoModal(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                >
+                  + Nuevo Curso
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cursos.map((curso) => (
+                  <div key={curso.id} className="bg-white border rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{curso.nombre}</h3>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <div>Nivel: {curso.nivel}</div>
+                      <div>Grado: {curso.grado}°</div>
+                      <div>Sección: {curso.seccion}</div>
+                      <div>Capacidad: {curso.capacidad_maxima}</div>
+                      <div>Profesor Jefe: {curso.profesor_jefe_nombre || 'No asignado'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Carga Masiva */}
+          {activeTab === 'carga' && (
+            <div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">Carga Masiva de Estudiantes</h3>
+                <p className="text-gray-600 text-sm mb-4">
+                  Formato: Nombre,Fecha Nacimiento,Curso ID,RUT,Teléfono,Dirección,Alergias,Medicamentos,Observaciones
+                </p>
+                <textarea
+                  rows="10"
+                  value={bulkData}
+                  onChange={(e) => setBulkData(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Juan Pérez,2010-05-15,curso-123,12345678-9,+56912345678,Av. Principal 123,Ninguna,Ninguno,Estudiante destacado"
+                />
+              </div>
+              <button
+                onClick={handleBulkUpload}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Cargar Estudiantes
+              </button>
+            </div>
+          )}
+
+          {/* Promoción */}
+          {activeTab === 'promocion' && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Promoción de Estudiantes</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Selecciona estudiantes y el curso al que serán promovidos
+              </p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Curso de Destino
+                </label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Seleccionar curso</option>
+                  {cursos.map(curso => (
+                    <option key={curso.id} value={curso.id}>{curso.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-center py-8 text-gray-500">
+                Funcionalidad de promoción en desarrollo...
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Student Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingEstudiante ? 'Editar Estudiante' : 'Nuevo Estudiante'}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nombre_completo}
+                    onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha de Nacimiento
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.fecha_nacimiento}
+                    onChange={(e) => setFormData({...formData, fecha_nacimiento: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Curso
+                  </label>
+                  <select
+                    value={formData.curso_id}
+                    onChange={(e) => setFormData({...formData, curso_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sin curso asignado</option>
+                    {cursos.map(curso => (
+                      <option key={curso.id} value={curso.id}>{curso.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    RUT
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.rut}
+                    onChange={(e) => setFormData({...formData, rut: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Teléfono de Emergencia
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.telefono_emergencia}
+                    onChange={(e) => setFormData({...formData, telefono_emergencia: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingEstudiante(null);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {editingEstudiante ? 'Actualizar' : 'Crear'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Modal */}
+      {showCursoModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Nuevo Curso</h3>
+              <form onSubmit={handleCursoSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Curso
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={cursoData.nombre}
+                    onChange={(e) => setCursoData({...cursoData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: 5to Básico A"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nivel</label>
+                    <select
+                      value={cursoData.nivel}
+                      onChange={(e) => setCursoData({...cursoData, nivel: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Básico">Básico</option>
+                      <option value="Medio">Medio</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Grado</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      required
+                      value={cursoData.grado}
+                      onChange={(e) => setCursoData({...cursoData, grado: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCursoModal(false)}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  >
+                    Crear Curso
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
