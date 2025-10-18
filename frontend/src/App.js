@@ -4148,7 +4148,7 @@ const AdminMarketplace = () => {
 
       {/* Filters and Actions */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
             <select
@@ -4164,6 +4164,20 @@ const AdminMarketplace = () => {
               <option value="alimentacion">Alimentación</option>
               <option value="deportes">Deportes</option>
               <option value="arte">Arte</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Catálogo</label>
+            <select
+              value={filtros.catalogo_id}
+              onChange={(e) => setFiltros({...filtros, catalogo_id: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos los catálogos</option>
+              {catalogos.map(catalogo => (
+                <option key={catalogo.id} value={catalogo.id}>{catalogo.nombre}</option>
+              ))}
             </select>
           </div>
           
@@ -4188,7 +4202,13 @@ const AdminMarketplace = () => {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowCatalogModal(true)}
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            + Nuevo Catálogo
+          </button>
           <button
             onClick={() => setShowModal(true)}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
