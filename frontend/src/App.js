@@ -3975,7 +3975,7 @@ const App = () => {
             path="/admin/pagos" 
             element={
               <ProtectedRoute allowedRoles={['admin_colegio']}>
-                <ComingSoon title="Gestión de Pagos" />
+                <AdminPagos />
               </ProtectedRoute>
             } 
           />
