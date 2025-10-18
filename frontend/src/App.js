@@ -643,6 +643,13 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">📢 Comunicación</h3>
               <p className="text-gray-600 text-sm">Circulares y comunicados</p>
             </Link>
+            <Link 
+              to="/admin/marketplace" 
+              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 border-l-4 border-orange-500"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">🛒 Marketplace</h3>
+              <p className="text-gray-600 text-sm">Gestiona productos y órdenes</p>
+            </Link>
           </>
         )}
         
