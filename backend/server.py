@@ -445,6 +445,39 @@ class CommunicationStats(BaseModel):
     tasa_lectura_promedio: float
     mensajes_por_tipo: Dict[str, int]
 
+# Payment Administration Models
+class PaymentAdminStats(BaseModel):
+    total_pagos: int
+    pagos_completados: int
+    pagos_pendientes: int
+    pagos_fallidos: int
+    ingresos_totales: float
+    ingresos_mes_actual: float
+    ingresos_por_metodo: Dict[str, float]
+    pagos_por_actividad: List[Dict[str, Any]]
+
+class PaymentFilters(BaseModel):
+    fecha_inicio: Optional[datetime] = None
+    fecha_fin: Optional[datetime] = None
+    estado: Optional[PaymentStatus] = None
+    metodo: Optional[PaymentMethod] = None
+    actividad_id: Optional[str] = None
+    estudiante_id: Optional[str] = None
+
+class BulkPaymentUpdate(BaseModel):
+    payment_ids: List[str]
+    nuevo_estado: PaymentStatus
+    notas: Optional[str] = None
+
+class PaymentReport(BaseModel):
+    periodo: str
+    total_ingresos: float
+    total_pagos: int
+    pagos_por_estado: Dict[str, int]
+    ingresos_por_actividad: List[Dict[str, Any]]
+    pagos_por_metodo: Dict[str, int]
+    tendencia_mensual: List[Dict[str, Any]]
+
 # Helper functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
