@@ -591,6 +591,64 @@ class CatalogCreate(BaseModel):
     nombre: str
     descripcion: str
 
+# Student Management Models
+class Curso(BaseModel):
+    nombre: str  # Ej: "5to Básico A"
+    nivel: str   # Ej: "Básico", "Medio"
+    grado: int   # Ej: 5
+    seccion: str # Ej: "A"
+    año_escolar: int
+    colegio_id: str
+    capacidad_maxima: int = 30
+    profesor_jefe_id: Optional[str] = None
+    profesor_jefe_nombre: Optional[str] = None
+
+class CursoCreate(BaseModel):
+    nombre: str
+    nivel: str
+    grado: int
+    seccion: str
+    año_escolar: int
+    capacidad_maxima: int = 30
+    profesor_jefe_id: Optional[str] = None
+
+class EstudianteCompleto(BaseModel):
+    nombre_completo: str
+    fecha_nacimiento: str
+    curso_id: Optional[str] = None
+    curso_nombre: Optional[str] = None
+    padre_id: Optional[str] = None
+    madre_id: Optional[str] = None
+    apoderado_id: Optional[str] = None
+    rut: Optional[str] = None
+    telefono_emergencia: Optional[str] = None
+    direccion: Optional[str] = None
+    alergias: Optional[str] = None
+    medicamentos: Optional[str] = None
+    observaciones: Optional[str] = None
+    estado: str = "activo"  # activo, inactivo, retirado
+    año_ingreso: Optional[int] = None
+
+class EstudianteCreate(BaseModel):
+    nombre_completo: str
+    fecha_nacimiento: str
+    curso_id: Optional[str] = None
+    padre_id: Optional[str] = None
+    rut: Optional[str] = None
+    telefono_emergencia: Optional[str] = None
+    direccion: Optional[str] = None
+    alergias: Optional[str] = None
+    medicamentos: Optional[str] = None
+    observaciones: Optional[str] = None
+
+class BulkStudentUpload(BaseModel):
+    estudiantes: List[EstudianteCreate]
+
+class PromotionData(BaseModel):
+    estudiante_ids: List[str]
+    nuevo_curso_id: str
+    nuevo_año: int
+
 # Helper functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
