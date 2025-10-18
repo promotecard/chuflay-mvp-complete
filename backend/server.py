@@ -478,6 +478,105 @@ class PaymentReport(BaseModel):
     pagos_por_metodo: Dict[str, int]
     tendencia_mensual: List[Dict[str, Any]]
 
+# POS & Marketplace Models
+class ProductCategory(str, Enum):
+    UNIFORMES = "uniformes"
+    UTILES_ESCOLARES = "utiles_escolares"
+    LIBROS = "libros"
+    TECNOLOGIA = "tecnologia"
+    ALIMENTACION = "alimentacion"
+    DEPORTES = "deportes"
+    ARTE = "arte"
+    OTROS = "otros"
+
+class ProductStatus(str, Enum):
+    ACTIVO = "activo"
+    INACTIVO = "inactivo"
+    AGOTADO = "agotado"
+    DESCONTINUADO = "descontinuado"
+
+class OrderStatus(str, Enum):
+    PENDIENTE = "pendiente"
+    CONFIRMADA = "confirmada"
+    PREPARANDO = "preparando"
+    LISTA = "lista"
+    ENTREGADA = "entregada"
+    CANCELADA = "cancelada"
+
+class Product(BaseModel):
+    nombre: str
+    descripcion: str
+    categoria: ProductCategory
+    precio: float
+    precio_descuento: Optional[float] = None
+    stock: int
+    stock_minimo: int = 10
+    imagen_url: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    marca: Optional[str] = None
+    colegio_id: str
+    proveedor: Optional[str] = None
+    estado: ProductStatus = ProductStatus.ACTIVO
+    especificaciones: Dict[str, Any] = {}
+
+class ProductCreate(BaseModel):
+    nombre: str
+    descripcion: str
+    categoria: ProductCategory
+    precio: float
+    precio_descuento: Optional[float] = None
+    stock: int
+    stock_minimo: int = 10
+    imagen_url: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    marca: Optional[str] = None
+    proveedor: Optional[str] = None
+    especificaciones: Dict[str, Any] = {}
+
+class ProductUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    precio: Optional[float] = None
+    precio_descuento: Optional[float] = None
+    stock: Optional[int] = None
+    stock_minimo: Optional[int] = None
+    imagen_url: Optional[str] = None
+    estado: Optional[ProductStatus] = None
+    especificaciones: Optional[Dict[str, Any]] = None
+
+class CartItem(BaseModel):
+    producto_id: str
+    cantidad: int
+    precio_unitario: float
+
+class Order(BaseModel):
+    usuario_id: str
+    colegio_id: str
+    items: List[CartItem]
+    subtotal: float
+    impuestos: float = 0.0
+    descuentos: float = 0.0
+    total: float
+    metodo_pago: PaymentMethod
+    estado: OrderStatus = OrderStatus.PENDIENTE
+    notas: Optional[str] = None
+    fecha_entrega: Optional[datetime] = None
+    entregado_por: Optional[str] = None
+
+class OrderCreate(BaseModel):
+    items: List[CartItem]
+    metodo_pago: PaymentMethod
+    notas: Optional[str] = None
+
+class MarketplaceStats(BaseModel):
+    total_productos: int
+    productos_activos: int
+    productos_agotados: int
+    valor_inventario: float
+    ordenes_pendientes: int
+    ventas_mes: float
+    productos_mas_vendidos: List[Dict[str, Any]]
+
 # Helper functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
