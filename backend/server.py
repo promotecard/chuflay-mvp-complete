@@ -532,6 +532,8 @@ class ProductCreate(BaseModel):
     marca: Optional[str] = None
     proveedor: Optional[str] = None
     especificaciones: Dict[str, Any] = {}
+    requiere_confirmacion: bool = False
+    catalogo_id: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     nombre: Optional[str] = None
