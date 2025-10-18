@@ -4402,6 +4402,64 @@ const AdminMarketplace = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Catálogo
+                  </label>
+                  <select
+                    value={formData.catalogo_id}
+                    onChange={(e) => setFormData({...formData, catalogo_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sin catálogo</option>
+                    {catalogos.map(catalogo => (
+                      <option key={catalogo.id} value={catalogo.id}>{catalogo.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Image Upload Section */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Imagen del Producto
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedImage(e.target.files[0])}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    {uploadLoading && (
+                      <div className="text-sm text-blue-600">Subiendo...</div>
+                    )}
+                  </div>
+                  {(formData.imagen_url || selectedImage) && (
+                    <div className="mt-2">
+                      <img 
+                        src={selectedImage ? URL.createObjectURL(selectedImage) : formData.imagen_url} 
+                        alt="Preview"
+                        className="h-20 w-20 object-cover rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirmation Option */}
+                <div className="md:col-span-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.requiere_confirmacion}
+                      onChange={(e) => setFormData({...formData, requiere_confirmacion: e.target.checked})}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Requiere confirmación antes de cobrar (para verificar existencia)
+                    </span>
+                  </label>
+                </div>
+
                 <div className="md:col-span-2 flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
