@@ -2012,10 +2012,237 @@ async def manual_confirm_payment(
     
     return {"message": "Payment confirmed successfully"}
 
+# POS & Marketplace System Endpoints
+
+@api_router.get("/marketplace/productos", response_model=List[Product])
+async def get_products(
+    categoria: Optional[ProductCategory] = None,
+    busqueda: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener productos del marketplace"""
+    query = {"colegio_id": current_user.colegio_id}
+    
+    if categoria:
+        query["categoria"] = categoria
+    
+    if busqueda:
+        query["$or"] = [
+            {"nombre": {"$regex": busqueda, "$options": "i"}},
+            {"descripcion": {"$regex": busqueda, "$options": "i"}},
+            {"marca": {"$regex": busqueda, "$options": "i"}}
+        ]
+    
+    productos = await db.productos.find(query).to_list(1000)
+    return [Product(**producto) for producto in productos]
+
+@api_router.post("/marketplace/productos", response_model=Product)
+async def create_product(product_data: ProductCreate, current_user: User = Depends(get_current_user)):
+    """Crear nuevo producto (Admin)"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    product_dict = product_data.dict()
+    product_dict.update({
+        "id": str(uuid.uuid4()),
+        "colegio_id": current_user.colegio_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    })
+    
+    await db.productos.insert_one(product_dict)
+    return Product(**product_dict)
+
+@api_router.put("/marketplace/productos/{producto_id}", response_model=Product)
+async def update_product(
+    producto_id: str, 
+    update_data: ProductUpdate, 
+    current_user: User = Depends(get_current_user)
+):
+    """Actualizar producto"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad del producto
+    producto = await db.productos.find_one({"id": producto_id})
+    if not producto:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and producto["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow().isoformat()
+    
+    await db.productos.update_one({"id": producto_id}, {"$set": update_dict})
+    
+    updated_producto = await db.productos.find_one({"id": producto_id})
+    return Product(**updated_producto)
+
+@api_router.delete("/marketplace/productos/{producto_id}")
+async def delete_product(producto_id: str, current_user: User = Depends(get_current_user)):
+    """Eliminar producto"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad del producto
+    producto = await db.productos.find_one({"id": producto_id})
+    if not producto:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and producto["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.productos.delete_one({"id": producto_id})
+    return {"message": "Product deleted successfully"}
+
+@api_router.get("/marketplace/estadisticas", response_model=MarketplaceStats)
+async def get_marketplace_stats(current_user: User = Depends(get_current_user)):
+    """Obtener estadísticas del marketplace"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        query["colegio_id"] = current_user.colegio_id
+    
+    productos = await db.productos.find(query).to_list(1000)
+    
+    total_productos = len(productos)
+    productos_activos = len([p for p in productos if p["estado"] == ProductStatus.ACTIVO])
+    productos_agotados = len([p for p in productos if p["stock"] <= 0])
+    valor_inventario = sum([p["precio"] * p["stock"] for p in productos])
+    
+    # Órdenes del mes actual
+    mes_actual = datetime.utcnow().replace(day=1)
+    ordenes_query = {"created_at": {"$gte": mes_actual.isoformat()}}
+    if current_user.role == UserRole.ADMIN_COLEGIO:
+        ordenes_query["colegio_id"] = current_user.colegio_id
+    
+    ordenes = await db.ordenes.find(ordenes_query).to_list(1000)
+    ordenes_pendientes = len([o for o in ordenes if o["estado"] in [OrderStatus.PENDIENTE, OrderStatus.CONFIRMADA, OrderStatus.PREPARANDO]])
+    ventas_mes = sum([o["total"] for o in ordenes if o["estado"] == OrderStatus.ENTREGADA])
+    
+    # Productos más vendidos (simplificado)
+    productos_mas_vendidos = []
+    
+    return MarketplaceStats(
+        total_productos=total_productos,
+        productos_activos=productos_activos,
+        productos_agotados=productos_agotados,
+        valor_inventario=valor_inventario,
+        ordenes_pendientes=ordenes_pendientes,
+        ventas_mes=ventas_mes,
+        productos_mas_vendidos=productos_mas_vendidos
+    )
+
+@api_router.post("/marketplace/ordenes", response_model=Order)
+async def create_order(order_data: OrderCreate, current_user: User = Depends(get_current_user)):
+    """Crear nueva orden"""
+    # Calcular totales
+    subtotal = sum([item.precio_unitario * item.cantidad for item in order_data.items])
+    impuestos = subtotal * 0.19  # 19% IVA
+    total = subtotal + impuestos
+    
+    # Verificar stock de productos
+    for item in order_data.items:
+        producto = await db.productos.find_one({"id": item.producto_id})
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Product {item.producto_id} not found")
+        
+        if producto["stock"] < item.cantidad:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient stock for {producto['nombre']}. Available: {producto['stock']}, Requested: {item.cantidad}"
+            )
+    
+    # Crear orden
+    order_dict = {
+        "id": str(uuid.uuid4()),
+        "usuario_id": current_user.id,
+        "colegio_id": current_user.colegio_id,
+        "items": [item.dict() for item in order_data.items],
+        "subtotal": subtotal,
+        "impuestos": impuestos,
+        "descuentos": 0.0,
+        "total": total,
+        "metodo_pago": order_data.metodo_pago,
+        "estado": OrderStatus.PENDIENTE,
+        "notas": order_data.notas,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    await db.ordenes.insert_one(order_dict)
+    
+    # Actualizar stock de productos
+    for item in order_data.items:
+        await db.productos.update_one(
+            {"id": item.producto_id},
+            {"$inc": {"stock": -item.cantidad}}
+        )
+    
+    return Order(**order_dict)
+
+@api_router.get("/marketplace/ordenes")
+async def get_orders(current_user: User = Depends(get_current_user)):
+    """Obtener órdenes del usuario o del colegio"""
+    if current_user.role in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        # Admins ven todas las órdenes del colegio
+        query = {}
+        if current_user.role == UserRole.ADMIN_COLEGIO:
+            query["colegio_id"] = current_user.colegio_id
+    else:
+        # Usuarios ven solo sus órdenes
+        query = {"usuario_id": current_user.id}
+    
+    ordenes = await db.ordenes.find(query).sort("created_at", -1).to_list(1000)
+    
+    # Enriquecer con información de productos
+    for orden in ordenes:
+        for item in orden["items"]:
+            producto = await db.productos.find_one({"id": item["producto_id"]})
+            if producto:
+                item["producto_nombre"] = producto["nombre"]
+                item["producto_imagen"] = producto.get("imagen_url")
+    
+    return ordenes
+
+@api_router.put("/marketplace/ordenes/{orden_id}/estado")
+async def update_order_status(
+    orden_id: str,
+    nuevo_estado: OrderStatus,
+    current_user: User = Depends(get_current_user)
+):
+    """Actualizar estado de orden (Solo admins)"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad de la orden
+    orden = await db.ordenes.find_one({"id": orden_id})
+    if not orden:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and orden["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_data = {
+        "estado": nuevo_estado,
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    if nuevo_estado == OrderStatus.ENTREGADA:
+        update_data["fecha_entrega"] = datetime.utcnow().isoformat()
+        update_data["entregado_por"] = current_user.full_name
+    
+    await db.ordenes.update_one({"id": orden_id}, {"$set": update_data})
+    
+    return {"message": f"Order status updated to {nuevo_estado}"}
+
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo v1.4 + Comunicación + Interface Admin Pagos"}
+    return {"message": "Chuflay API - Sistema Completo v1.5 + Comunicación + Admin Pagos + POS & Marketplace"}
 
 # Include router
 app.include_router(api_router)
