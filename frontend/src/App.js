@@ -3891,6 +3891,644 @@ const AdminPagos = () => {
   );
 };
 
+// Componente POS & Marketplace para administradores
+const AdminMarketplace = () => {
+  const [productos, setProductos] = useState([]);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [filtros, setFiltros] = useState({
+    categoria: '',
+    busqueda: ''
+  });
+  const [formData, setFormData] = useState({
+    nombre: '',
+    descripcion: '',
+    categoria: 'utiles_escolares',
+    precio: '',
+    precio_descuento: '',
+    stock: '',
+    stock_minimo: '10',
+    marca: '',
+    codigo_barras: '',
+    proveedor: ''
+  });
+
+  useEffect(() => {
+    fetchStats();
+    fetchProductos();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/marketplace/estadisticas`);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching marketplace stats:', error);
+    }
+  };
+
+  const fetchProductos = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros.categoria) params.append('categoria', filtros.categoria);
+      if (filtros.busqueda) params.append('busqueda', filtros.busqueda);
+      
+      const response = await axios.get(`${API}/marketplace/productos?${params}`);
+      setProductos(response.data);
+    } catch (error) {
+      console.error('Error fetching productos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const dataToSend = {
+        ...formData,
+        precio: parseFloat(formData.precio),
+        precio_descuento: formData.precio_descuento ? parseFloat(formData.precio_descuento) : null,
+        stock: parseInt(formData.stock),
+        stock_minimo: parseInt(formData.stock_minimo)
+      };
+
+      if (editingProduct) {
+        await axios.put(`${API}/marketplace/productos/${editingProduct.id}`, dataToSend);
+      } else {
+        await axios.post(`${API}/marketplace/productos`, dataToSend);
+      }
+      
+      setShowModal(false);
+      setEditingProduct(null);
+      resetForm();
+      fetchProductos();
+      fetchStats();
+    } catch (error) {
+      console.error('Error saving producto:', error);
+      alert('Error al guardar el producto');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      nombre: '',
+      descripcion: '',
+      categoria: 'utiles_escolares',
+      precio: '',
+      precio_descuento: '',
+      stock: '',
+      stock_minimo: '10',
+      marca: '',
+      codigo_barras: '',
+      proveedor: ''
+    });
+  };
+
+  const handleEdit = (producto) => {
+    setEditingProduct(producto);
+    setFormData({
+      nombre: producto.nombre,
+      descripcion: producto.descripcion,
+      categoria: producto.categoria,
+      precio: producto.precio.toString(),
+      precio_descuento: producto.precio_descuento ? producto.precio_descuento.toString() : '',
+      stock: producto.stock.toString(),
+      stock_minimo: producto.stock_minimo.toString(),
+      marca: producto.marca || '',
+      codigo_barras: producto.codigo_barras || '',
+      proveedor: producto.proveedor || ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (productoId) => {
+    if (window.confirm('¿Está seguro de eliminar este producto?')) {
+      try {
+        await axios.delete(`${API}/marketplace/productos/${productoId}`);
+        fetchProductos();
+        fetchStats();
+      } catch (error) {
+        console.error('Error deleting producto:', error);
+      }
+    }
+  };
+
+  const getStockStatus = (stock, stock_minimo) => {
+    if (stock <= 0) return { color: 'text-red-600', text: 'Agotado' };
+    if (stock <= stock_minimo) return { color: 'text-yellow-600', text: 'Stock Bajo' };
+    return { color: 'text-green-600', text: 'En Stock' };
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Marketplace - Gestión de Productos">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Marketplace - Gestión de Productos">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-blue-600">{stats.total_productos || 0}</div>
+          <div className="text-gray-600 text-sm">Total Productos</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-green-600">{stats.productos_activos || 0}</div>
+          <div className="text-gray-600 text-sm">Productos Activos</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-red-600">{stats.productos_agotados || 0}</div>
+          <div className="text-gray-600 text-sm">Productos Agotados</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-2xl font-bold text-purple-600">${stats.valor_inventario || 0}</div>
+          <div className="text-gray-600 text-sm">Valor Inventario</div>
+        </div>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
+            <select
+              value={filtros.categoria}
+              onChange={(e) => setFiltros({...filtros, categoria: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas las categorías</option>
+              <option value="uniformes">Uniformes</option>
+              <option value="utiles_escolares">Útiles Escolares</option>
+              <option value="libros">Libros</option>
+              <option value="tecnologia">Tecnología</option>
+              <option value="alimentacion">Alimentación</option>
+              <option value="deportes">Deportes</option>
+              <option value="arte">Arte</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Búsqueda</label>
+            <input
+              type="text"
+              placeholder="Buscar productos..."
+              value={filtros.busqueda}
+              onChange={(e) => setFiltros({...filtros, busqueda: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={fetchProductos}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Filtrar
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            + Nuevo Producto
+          </button>
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {productos.map((producto) => {
+          const stockStatus = getStockStatus(producto.stock, producto.stock_minimo);
+          return (
+            <div key={producto.id} className="bg-white rounded-lg shadow p-6">
+              {producto.imagen_url && (
+                <img 
+                  src={producto.imagen_url} 
+                  alt={producto.nombre}
+                  className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+              )}
+              
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-lg font-semibold text-gray-900">{producto.nombre}</h3>
+                <span className={`text-sm font-medium ${stockStatus.color}`}>
+                  {stockStatus.text}
+                </span>
+              </div>
+              
+              <p className="text-gray-600 text-sm mb-3">{producto.descripcion}</p>
+              
+              <div className="space-y-1 mb-4">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Precio:</span>
+                  <span className="text-sm font-semibold">${producto.precio}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Stock:</span>
+                  <span className="text-sm">{producto.stock} unidades</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Categoría:</span>
+                  <span className="text-sm capitalize">{producto.categoria.replace('_', ' ')}</span>
+                </div>
+              </div>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleEdit(producto)}
+                  className="flex-1 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => handleDelete(producto.id)}
+                  className="flex-1 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {productos.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🛒</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No hay productos</h2>
+          <p className="text-gray-600">Comienza agregando productos al marketplace</p>
+        </div>
+      )}
+
+      {/* Product Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Producto
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descripción
+                  </label>
+                  <textarea
+                    rows="3"
+                    required
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Categoría
+                  </label>
+                  <select
+                    required
+                    value={formData.categoria}
+                    onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="uniformes">Uniformes</option>
+                    <option value="utiles_escolares">Útiles Escolares</option>
+                    <option value="libros">Libros</option>
+                    <option value="tecnologia">Tecnología</option>
+                    <option value="alimentacion">Alimentación</option>
+                    <option value="deportes">Deportes</option>
+                    <option value="arte">Arte</option>
+                    <option value="otros">Otros</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Precio
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.precio}
+                    onChange={(e) => setFormData({...formData, precio: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stock
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.stock}
+                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stock Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.stock_minimo}
+                    onChange={(e) => setFormData({...formData, stock_minimo: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Marca
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.marca}
+                    onChange={(e) => setFormData({...formData, marca: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Proveedor
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.proveedor}
+                    onChange={(e) => setFormData({...formData, proveedor: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingProduct(null);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {editingProduct ? 'Actualizar' : 'Crear'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+// Componente Marketplace para Padres (Vista de compra)
+const MarketplacePage = () => {
+  const [productos, setProductos] = useState([]);
+  const [carrito, setCarrito] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCart, setShowCart] = useState(false);
+
+  useEffect(() => {
+    fetchProductos();
+  }, []);
+
+  const fetchProductos = async () => {
+    try {
+      const response = await axios.get(`${API}/marketplace/productos`);
+      setProductos(response.data.filter(p => p.estado === 'activo' && p.stock > 0));
+    } catch (error) {
+      console.error('Error fetching productos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const agregarAlCarrito = (producto) => {
+    const existingItem = carrito.find(item => item.producto_id === producto.id);
+    
+    if (existingItem) {
+      setCarrito(carrito.map(item => 
+        item.producto_id === producto.id 
+          ? {...item, cantidad: item.cantidad + 1}
+          : item
+      ));
+    } else {
+      setCarrito([...carrito, {
+        producto_id: producto.id,
+        producto_nombre: producto.nombre,
+        cantidad: 1,
+        precio_unitario: producto.precio_descuento || producto.precio
+      }]);
+    }
+  };
+
+  const removerDelCarrito = (productoId) => {
+    setCarrito(carrito.filter(item => item.producto_id !== productoId));
+  };
+
+  const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0);
+  const cantidadTotal = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+
+  const procesarOrden = async () => {
+    if (carrito.length === 0) return;
+    
+    try {
+      await axios.post(`${API}/marketplace/ordenes`, {
+        items: carrito.map(item => ({
+          producto_id: item.producto_id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario
+        })),
+        metodo_pago: 'efectivo',  // Por defecto
+        notas: ''
+      });
+      
+      setCarrito([]);
+      setShowCart(false);
+      alert('Orden creada exitosamente');
+      fetchProductos(); // Actualizar stock
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Error al procesar la orden');
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="Marketplace Escolar">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title="Marketplace Escolar">
+      {/* Cart Button */}
+      <div className="fixed top-20 right-4 z-40">
+        <button
+          onClick={() => setShowCart(!showCart)}
+          className="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
+        >
+          🛒 {cantidadTotal > 0 && <span className="ml-1">({cantidadTotal})</span>}
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <p className="text-gray-600">Descubre y compra productos escolares</p>
+      </div>
+
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {productos.map((producto) => (
+          <div key={producto.id} className="bg-white rounded-lg shadow p-6">
+            {producto.imagen_url && (
+              <img 
+                src={producto.imagen_url} 
+                alt={producto.nombre}
+                className="w-full h-48 object-cover rounded-lg mb-4"
+              />
+            )}
+            
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{producto.nombre}</h3>
+            <p className="text-gray-600 text-sm mb-3">{producto.descripcion}</p>
+            
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                {producto.precio_descuento ? (
+                  <>
+                    <span className="text-lg font-bold text-green-600">${producto.precio_descuento}</span>
+                    <span className="text-sm text-gray-500 line-through ml-2">${producto.precio}</span>
+                  </>
+                ) : (
+                  <span className="text-lg font-bold text-gray-900">${producto.precio}</span>
+                )}
+              </div>
+              <span className="text-sm text-gray-500">{producto.stock} disponibles</span>
+            </div>
+
+            <button
+              onClick={() => agregarAlCarrito(producto)}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              disabled={producto.stock === 0}
+            >
+              {producto.stock > 0 ? 'Agregar al Carrito' : 'Agotado'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {productos.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🛍️</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No hay productos disponibles</h2>
+          <p className="text-gray-600">Próximamente habrá productos disponibles</p>
+        </div>
+      )}
+
+      {/* Cart Sidebar */}
+      {showCart && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="absolute right-0 top-0 h-full w-96 bg-white shadow-lg p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold">Carrito de Compras</h3>
+              <button
+                onClick={() => setShowCart(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {carrito.map((item) => (
+                <div key={item.producto_id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                  <div>
+                    <div className="font-medium">{item.producto_nombre}</div>
+                    <div className="text-sm text-gray-600">
+                      ${item.precio_unitario} x {item.cantidad}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold">${(item.precio_unitario * item.cantidad).toFixed(2)}</span>
+                    <button
+                      onClick={() => removerDelCarrito(item.producto_id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {carrito.length > 0 ? (
+              <>
+                <div className="border-t pt-4 mb-6">
+                  <div className="flex justify-between text-lg font-semibold">
+                    <span>Total:</span>
+                    <span>${totalCarrito.toFixed(2)}</span>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={procesarOrden}
+                  className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700"
+                >
+                  Procesar Orden
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Tu carrito está vacío
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
 // Página temporal para rutas no implementadas
 const ComingSoon = ({ title }) => (
   <Layout title={title}>
