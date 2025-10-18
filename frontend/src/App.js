@@ -4484,6 +4484,63 @@ const AdminMarketplace = () => {
           </div>
         </div>
       )}
+
+      {/* Catalog Modal */}
+      {showCatalogModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Nuevo Catálogo</h3>
+              <form onSubmit={handleCatalogSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Catálogo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={catalogData.nombre}
+                    onChange={(e) => setCatalogData({...catalogData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: Uniformes 2024, Útiles Escolares"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descripción
+                  </label>
+                  <textarea
+                    rows="3"
+                    required
+                    value={catalogData.descripcion}
+                    onChange={(e) => setCatalogData({...catalogData, descripcion: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Describe el catálogo..."
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCatalogModal(false);
+                      setCatalogData({ nombre: '', descripcion: '' });
+                    }}
+                    className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  >
+                    Crear Catálogo
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
