@@ -4088,7 +4088,10 @@ const AdminMarketplace = () => {
       stock_minimo: producto.stock_minimo.toString(),
       marca: producto.marca || '',
       codigo_barras: producto.codigo_barras || '',
-      proveedor: producto.proveedor || ''
+      proveedor: producto.proveedor || '',
+      requiere_confirmacion: producto.requiere_confirmacion || false,
+      catalogo_id: producto.catalogo_id || '',
+      imagen_url: producto.imagen_url || ''
     });
     setShowModal(true);
   };
