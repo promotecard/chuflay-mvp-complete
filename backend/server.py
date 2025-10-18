@@ -258,24 +258,23 @@ class Activity(BaseModel):
 class ActivityCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
-    fecha_inicio: datetime
-    fecha_fin: datetime
+    fecha: str  # Será convertido a datetime
+    horario_inicio: str
+    horario_fin: str
+    ubicacion: Optional[str] = None
+    capacidad_maxima: int
+    costo: float = 0.0
+    categoria: str
+    responsable: Optional[str] = None
+    imagen_url: Optional[str] = None
+    campos_personalizados: Dict[str, Any] = {}
+    # Campos del modelo original que mantenemos para compatibilidad
     cursos_participantes: List[str] = []
-    cupo_maximo: Optional[int] = None
-    costo_estudiante: float = 0.0
     materiales_requeridos: List[str] = []
     visibilidad: ActivityVisibility = ActivityVisibility.INTERNA
-    responsable: Optional[str] = None
     metodos_pago: List[PaymentMethod] = []
     es_permanente: bool = False
     requiere_validacion_manual: bool = False
-    # Nuevos campos
-    imagen_actividad: Optional[str] = None
-    campos_personalizados: List[FormField] = []
-    ubicacion: Optional[str] = None
-    instructor: Optional[str] = None
-    edad_minima: Optional[int] = None
-    edad_maxima: Optional[int] = None
 
 class ActivityUpdate(BaseModel):
     nombre: Optional[str] = None
