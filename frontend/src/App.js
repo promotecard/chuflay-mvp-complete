@@ -3908,13 +3908,17 @@ const AdminPagos = () => {
 // Componente POS & Marketplace para administradores
 const AdminMarketplace = () => {
   const [productos, setProductos] = useState([]);
+  const [catalogos, setCatalogos] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [filtros, setFiltros] = useState({
     categoria: '',
-    busqueda: ''
+    busqueda: '',
+    catalogo_id: ''
   });
   const [formData, setFormData] = useState({
     nombre: '',
@@ -3926,8 +3930,16 @@ const AdminMarketplace = () => {
     stock_minimo: '10',
     marca: '',
     codigo_barras: '',
-    proveedor: ''
+    proveedor: '',
+    requiere_confirmacion: false,
+    catalogo_id: '',
+    imagen_url: ''
   });
+  const [catalogData, setCatalogData] = useState({
+    nombre: '',
+    descripcion: ''
+  });
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     fetchStats();
