@@ -3956,6 +3956,15 @@ const AdminMarketplace = () => {
     }
   };
 
+  const fetchCatalogos = async () => {
+    try {
+      const response = await axios.get(`${API}/marketplace/catalogos`);
+      setCatalogos(response.data);
+    } catch (error) {
+      console.error('Error fetching catalogos:', error);
+    }
+  };
+
   const fetchProductos = async () => {
     try {
       const params = new URLSearchParams();
@@ -3968,6 +3977,30 @@ const AdminMarketplace = () => {
       console.error('Error fetching productos:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (file) => {
+    if (!file) return null;
+    
+    setUploadLoading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      
+      const response = await axios.post(`${API}/upload/imagen`, formDataUpload, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      return response.data.url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Error al subir la imagen');
+      return null;
+    } finally {
+      setUploadLoading(false);
     }
   };
 
