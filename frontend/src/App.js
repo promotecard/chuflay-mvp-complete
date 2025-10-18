@@ -4007,13 +4007,23 @@ const AdminMarketplace = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    let imageUrl = formData.imagen_url;
+    
+    // Upload image if selected
+    if (selectedImage) {
+      imageUrl = await handleImageUpload(selectedImage);
+      if (!imageUrl) return; // Exit if upload failed
+    }
+    
     try {
       const dataToSend = {
         ...formData,
         precio: parseFloat(formData.precio),
         precio_descuento: formData.precio_descuento ? parseFloat(formData.precio_descuento) : null,
         stock: parseInt(formData.stock),
-        stock_minimo: parseInt(formData.stock_minimo)
+        stock_minimo: parseInt(formData.stock_minimo),
+        imagen_url: imageUrl,
+        catalogo_id: formData.catalogo_id || null
       };
 
       if (editingProduct) {
@@ -4030,6 +4040,20 @@ const AdminMarketplace = () => {
     } catch (error) {
       console.error('Error saving producto:', error);
       alert('Error al guardar el producto');
+    }
+  };
+
+  const handleCatalogSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await axios.post(`${API}/marketplace/catalogos`, catalogData);
+      setShowCatalogModal(false);
+      setCatalogData({ nombre: '', descripcion: '' });
+      fetchCatalogos();
+    } catch (error) {
+      console.error('Error creating catalog:', error);
+      alert('Error al crear catálogo');
     }
   };
 
