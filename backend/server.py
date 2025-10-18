@@ -2254,6 +2254,48 @@ async def update_order_status(
     
     return {"message": f"Order status updated to {nuevo_estado}"}
 
+# Catalog Management Endpoints
+@api_router.get("/marketplace/catalogos", response_model=List[Catalog])
+async def get_catalogs(current_user: User = Depends(get_current_user)):
+    """Obtener catálogos del colegio"""
+    query = {"colegio_id": current_user.colegio_id}
+    catalogos = await db.catalogos.find(query).to_list(1000)
+    return [Catalog(**catalogo) for catalogo in catalogos]
+
+@api_router.post("/marketplace/catalogos", response_model=Catalog)
+async def create_catalog(catalog_data: CatalogCreate, current_user: User = Depends(get_current_user)):
+    """Crear nuevo catálogo"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    catalog_dict = catalog_data.dict()
+    catalog_dict.update({
+        "id": str(uuid.uuid4()),
+        "colegio_id": current_user.colegio_id,
+        "activo": True,
+        "created_at": datetime.utcnow().isoformat()
+    })
+    
+    await db.catalogos.insert_one(catalog_dict)
+    return Catalog(**catalog_dict)
+
+@api_router.delete("/marketplace/catalogos/{catalogo_id}")
+async def delete_catalog(catalogo_id: str, current_user: User = Depends(get_current_user)):
+    """Eliminar catálogo"""
+    if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.ADMIN_GLOBAL]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verificar propiedad
+    catalogo = await db.catalogos.find_one({"id": catalogo_id})
+    if not catalogo:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    
+    if current_user.role == UserRole.ADMIN_COLEGIO and catalogo["colegio_id"] != current_user.colegio_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.catalogos.delete_one({"id": catalogo_id})
+    return {"message": "Catalog deleted successfully"}
+
 # Create Test Users Endpoint (for development)
 @api_router.post("/create-test-users")
 async def create_test_users():
