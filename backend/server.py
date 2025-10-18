@@ -2239,10 +2239,125 @@ async def update_order_status(
     
     return {"message": f"Order status updated to {nuevo_estado}"}
 
+# Create Test Users Endpoint (for development)
+@api_router.post("/create-test-users")
+async def create_test_users():
+    """Crear usuarios de prueba para testing"""
+    
+    # Crear colegio de prueba primero
+    test_colegio = {
+        "id": "test-colegio-001",
+        "nombre": "Colegio Demo",
+        "direccion": "Calle Principal 123",
+        "telefono": "+56912345678",
+        "email": "demo@colegio.cl",
+        "director": "Director Test",
+        "nivel_educativo": "Mixto",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    # Verificar si el colegio ya existe
+    existing_colegio = await db.colegios.find_one({"id": test_colegio["id"]})
+    if not existing_colegio:
+        await db.colegios.insert_one(test_colegio)
+    
+    # Usuarios de prueba
+    test_users = [
+        {
+            "id": "admin-global-001",
+            "email": "admin@chuflay.com",
+            "hashed_password": hash_password("admin123"),
+            "full_name": "Admin Global",
+            "nombre_completo": "Admin Global",
+            "role": UserRole.ADMIN_GLOBAL,
+            "colegio_id": None,
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
+        },
+        {
+            "id": "admin-colegio-001", 
+            "email": "admin@demo.com",
+            "hashed_password": hash_password("admin123"),
+            "full_name": "Admin Colegio Demo",
+            "nombre_completo": "Admin Colegio Demo",
+            "role": UserRole.ADMIN_COLEGIO,
+            "colegio_id": "test-colegio-001",
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
+        },
+        {
+            "id": "padre-001",
+            "email": "padre@demo.com", 
+            "hashed_password": hash_password("padre123"),
+            "full_name": "María González",
+            "nombre_completo": "María González",
+            "role": UserRole.PADRE,
+            "colegio_id": "test-colegio-001",
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
+        },
+        {
+            "id": "estudiante-001",
+            "email": "estudiante@demo.com",
+            "hashed_password": hash_password("estudiante123"), 
+            "full_name": "Juan González",
+            "nombre_completo": "Juan González",
+            "role": UserRole.ESTUDIANTE,
+            "colegio_id": "test-colegio-001",
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
+        },
+        {
+            "id": "profesor-001",
+            "email": "profesor@demo.com",
+            "hashed_password": hash_password("profesor123"),
+            "full_name": "Carlos Profesor",
+            "nombre_completo": "Carlos Profesor", 
+            "role": UserRole.PROFESOR,
+            "colegio_id": "test-colegio-001",
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
+        }
+    ]
+    
+    created_users = []
+    
+    for user_data in test_users:
+        # Verificar si el usuario ya existe
+        existing_user = await db.users.find_one({"email": user_data["email"]})
+        if not existing_user:
+            await db.users.insert_one(user_data)
+            created_users.append({
+                "email": user_data["email"],
+                "role": user_data["role"],
+                "full_name": user_data["full_name"]
+            })
+        else:
+            # Usuario ya existe, agregar a la lista con nota
+            created_users.append({
+                "email": user_data["email"],
+                "role": user_data["role"], 
+                "full_name": user_data["full_name"],
+                "status": "already_exists"
+            })
+    
+    return {
+        "message": "Test users creation completed",
+        "colegio_created": test_colegio["nombre"],
+        "users": created_users,
+        "credentials": [
+            {"role": "Admin Global", "email": "admin@chuflay.com", "password": "admin123"},
+            {"role": "Admin Colegio", "email": "admin@demo.com", "password": "admin123"},
+            {"role": "Padre", "email": "padre@demo.com", "password": "padre123"},
+            {"role": "Estudiante", "email": "estudiante@demo.com", "password": "estudiante123"},
+            {"role": "Profesor", "email": "profesor@demo.com", "password": "profesor123"}
+        ]
+    }
+
 # Test endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Chuflay API - Sistema Completo v1.5 + Comunicación + Admin Pagos + POS & Marketplace"}
+    return {"message": "Chuflay API - Sistema Completo v1.6 + Test Users Ready"}
 
 # Include router
 app.include_router(api_router)
