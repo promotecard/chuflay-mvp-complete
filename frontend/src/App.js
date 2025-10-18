@@ -4714,6 +4714,24 @@ const App = () => {
             } 
           />
           
+          {/* Marketplace Routes */}
+          <Route 
+            path="/admin/marketplace" 
+            element={
+              <ProtectedRoute allowedRoles={['admin_colegio']}>
+                <AdminMarketplace />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/marketplace" 
+            element={
+              <ProtectedRoute allowedRoles={['padre']}>
+                <MarketplacePage />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
