@@ -887,13 +887,51 @@ async def create_activity(activity_data: ActivityCreate, current_user: User = De
     if current_user.role not in [UserRole.ADMIN_COLEGIO, UserRole.PROFESOR]:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    activity = Activity(**activity_data.dict(), colegio_id=current_user.colegio_id)
+    # Convertir los datos del frontend al formato interno
+    activity_dict = activity_data.dict()
     
-    if activity.visibilidad in [ActivityVisibility.EXTERNA, ActivityVisibility.MIXTA]:
-        activity.link_inscripcion = f"/inscripcion/{activity.id}"
+    # Convertir fecha string a datetime
+    fecha_str = activity_dict.pop('fecha')
+    fecha_date = datetime.fromisoformat(fecha_str)
     
-    await db.actividades.insert_one(activity.dict())
-    return activity
+    # Construir el diccionario de actividad
+    activity_data_internal = {
+        "id": str(uuid.uuid4()),
+        "nombre": activity_dict["nombre"],
+        "descripcion": activity_dict.get("descripcion", ""),
+        "fecha": fecha_str,
+        "horario_inicio": activity_dict["horario_inicio"],
+        "horario_fin": activity_dict["horario_fin"],
+        "ubicacion": activity_dict.get("ubicacion", ""),
+        "capacidad_maxima": activity_dict["capacidad_maxima"],
+        "costo": activity_dict["costo"],
+        "categoria": activity_dict["categoria"],
+        "responsable": activity_dict.get("responsable", ""),
+        "imagen_url": activity_dict.get("imagen_url"),
+        "campos_personalizados": activity_dict.get("campos_personalizados", {}),
+        "colegio_id": current_user.colegio_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        # Campos adicionales requeridos por el modelo
+        "fecha_inicio": fecha_date.isoformat(),
+        "fecha_fin": fecha_date.isoformat(),
+        "cursos_participantes": activity_dict.get("cursos_participantes", []),
+        "cupo_maximo": activity_dict["capacidad_maxima"],
+        "costo_estudiante": activity_dict["costo"],
+        "materiales_requeridos": activity_dict.get("materiales_requeridos", []),
+        "visibilidad": activity_dict.get("visibilidad", ActivityVisibility.INTERNA),
+        "metodos_pago": activity_dict.get("metodos_pago", []),
+        "es_permanente": activity_dict.get("es_permanente", False),
+        "requiere_validacion_manual": activity_dict.get("requiere_validacion_manual", False),
+        "estado": "activa"
+    }
+    
+    # Serializar datetime para MongoDB
+    if activity_data_internal.get("imagen_url") is None:
+        activity_data_internal.pop("imagen_url", None)
+    
+    await db.actividades.insert_one(activity_data_internal)
+    return Activity(**activity_data_internal)
 
 @api_router.get("/actividades", response_model=List[Activity])
 async def get_activities(
