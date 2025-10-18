@@ -1954,7 +1954,7 @@ const GlobalUsuarios = () => {
   const handleImpersonate = async (userId) => {
     setImpersonateLoading(prev => ({ ...prev, [userId]: true }));
     try {
-      const response = await axios.post(`${API}/global/impersonate`, { user_id: userId });
+      const response = await axios.post(`${API}/global/impersonate/${userId}`);
       const { access_token, user: userData } = response.data;
       
       localStorage.setItem('token', access_token);
