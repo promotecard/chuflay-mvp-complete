@@ -4068,8 +4068,12 @@ const AdminMarketplace = () => {
       stock_minimo: '10',
       marca: '',
       codigo_barras: '',
-      proveedor: ''
+      proveedor: '',
+      requiere_confirmacion: false,
+      catalogo_id: '',
+      imagen_url: ''
     });
+    setSelectedImage(null);
   };
 
   const handleEdit = (producto) => {
